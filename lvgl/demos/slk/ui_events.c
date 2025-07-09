@@ -36,18 +36,17 @@ void BEE1(lv_event_t *e) {
   // HAL_Delay(20);
   // HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_SET);
   if (bee) {
-		//HAL_GPIO_WritePin(GPIOH, GPIO_PIN_15, GPIO_PIN_RESET);
-    //HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);
-		//__HAL_TIM_CLEAR_FLAG(&htim13, TIM_FLAG_UPDATE); // 清除可能存在的更新中断标志,否则第一次就会进中断
-    //HAL_TIM_Base_Start_IT(&htim13);//关闭比比响
+		HAL_GPIO_WritePin(GPIOH, GPIO_PIN_15, GPIO_PIN_RESET);
+    HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);
+		__HAL_TIM_CLEAR_FLAG(&htim13, TIM_FLAG_UPDATE); // 清除可能存在的更新中断标志,否则第一次就会进中断
+    HAL_TIM_Base_Start_IT(&htim13);//关闭比比响
 		
   }
 }
 void hot_start_on(lv_event_t *e) {
   if (work_mode == 1&&EYE_status==1) {
     lv_obj_add_flag(ui_Image5, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag(ui_Image70,
-                  LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
+    lv_obj_add_flag(ui_Image70,LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
     volatile static AXI_SRAM  CTRL_MSG pData;
     pData.cmd_head_high = 0x5A;
     pData.cmd_head_low = 0xA5;
@@ -120,6 +119,7 @@ void auto_set_value(lv_event_t *e) {
                   LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
   lv_obj_add_flag(ui_Container7,
                   LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
+	lv_obj_add_flag(ui_Image57,LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
 
     if (prepare_set == 0) {
       value3 = 1;
@@ -175,10 +175,9 @@ void hot_start(lv_event_t *e) {
                         &ui_hotting_screen_init);
  lv_obj_clear_flag(ui_Image5, LV_OBJ_FLAG_CLICKABLE); // 禁用点击
   lv_obj_clear_flag(ui_Image70, LV_OBJ_FLAG_HIDDEN);   /// 显示开始按钮
-  lv_obj_add_flag(ui_Container10,
-                  LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
-  lv_obj_add_flag(ui_Container3,
-                  LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
+  lv_obj_add_flag(ui_Container10,LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
+  lv_obj_add_flag(ui_Container3,LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
+	lv_obj_add_flag(ui_Image53,LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
   work_mode = 1;
   volatile static AXI_SRAM  CTRL_MSG pData;
 
@@ -208,6 +207,7 @@ void pulsation_start(lv_event_t *e) {
                         &ui_pulsationning_screen_init);
                           lv_obj_clear_flag(ui_Image22, LV_OBJ_FLAG_CLICKABLE); // 禁用点击
   lv_obj_clear_flag(ui_Image74, LV_OBJ_FLAG_HIDDEN);    /// 显示开始按钮
+		lv_obj_add_flag(ui_Image56,LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
   lv_obj_add_flag(ui_Container4,
                   LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
   lv_obj_add_flag(ui_Container5,
@@ -246,6 +246,7 @@ void auto_start(lv_event_t *e) {
                   LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
   lv_obj_add_flag(ui_Container7,
                   LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
+	lv_obj_add_flag(ui_Image57,LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
   work_mode = 3;
   minutes = value3;
   seconds = 0;
@@ -634,13 +635,17 @@ void formattee(lv_event_t *e) {
                         &ui_Factorymode_screen_init);
     BEE1(e);
     formattee_value = 0;
+		work_mode = 0;
+		lv_obj_clear_flag(
+        ui_Image75,
+        LV_OBJ_FLAG_HIDDEN); 
   }
   formattee_value += 1;
 }
 void work_mode_0(lv_event_t *e) { work_mode = 0; }
 void Factorymodecall(lv_event_t * e)
 {
-      minutes = 60;
+      minutes = 0;
   seconds = 0;
   lv_label_set_text_fmt(ui_cut_d_l31, "%02d", minutes); // 鏄剧ず鍒嗛挓
   lv_label_set_text_fmt(ui_cut_d_l32, "%02d", 0);       // 鏄剧ず绉掗拡
@@ -648,8 +653,8 @@ void Factorymodecall(lv_event_t * e)
   lv_label_set_text_fmt(ui_Label46, "%03d", 000); // 鍒濆?嬪寲鑴夊姩鏄剧ず鏁板€?
 
  	float press_value = atof(lv_textarea_get_text(ui_TextArea2)); // 获取当前值
-  float tempature_value = atof(lv_textarea_get_text(ui_TextArea9)); // 获取当前值
-
+  //float tempature_value = atof(lv_textarea_get_text(ui_TextArea9)); // 获取当前值
+float tempature_value = 42.5; // 获取当前值
       work_mode = 3;
       BEE1(e);
       _ui_screen_change(&ui_autoing, LV_SCR_LOAD_ANIM_NONE, 0, 0,
@@ -677,12 +682,26 @@ pData.cmd_type_low = 0x54;
       pData.end_high = 0xff; // 甯у熬 // 甯у熬
       pData.end_low = 0xff;  // 甯у熬
       UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
+			//HAL_NVIC_DisableIRQ(TIM14_IRQn);
+
+
 
 }
 
 void eyeclear(lv_event_t * e)
 {
 	BEE1(e);
+		volatile static AXI_SRAM prepare_data pData;
+    pData.cmd_head_high = 0x6A;
+    pData.cmd_head_low = 0xA6;
+    pData.frame_length = 0x0b;
+    pData.cmd_type_high = 0x10;
+    pData.cmd_type_low = 0x47;
+    pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
+    pData.end_high = 0xff; // 甯у熬 // 甯у熬
+    pData.end_low = 0xff;  // 甯у熬
+    // SCB_CleanInvalidateDCache();
+    UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
 }
 
 void setclear(lv_event_t * e)
@@ -708,7 +727,7 @@ void pressset(lv_event_t * e)
 
 void temprtaureset(lv_event_t * e)
 {
-	 lv_keyboard_set_textarea(ui_Keyboard1, ui_TextArea9);  // 绑定键盘与当前文本框
+	 //lv_keyboard_set_textarea(ui_Keyboard1, ui_TextArea9);  // 绑定键盘与当前文本框
 }
 
 void kb_event_cb(lv_event_t * e)

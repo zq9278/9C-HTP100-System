@@ -157,45 +157,29 @@ __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
   while (1)
   {
     /* USER CODE END WHILE */
-
     /* USER CODE BEGIN 3 */
+		HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_14);
 		if(Tim7_flag_1s==1){
 			HAL_GPIO_WritePin(GPIOA,GPIO_PIN_11,GPIO_PIN_SET);//switch of lcd backlight,high level is on
 			
 		}
      //HAL_Delay(90);
      lv_timer_handler();
- /*
-				   if (Tim7_flag_60ms == 1)//�????60ms扫描触摸屏一�????
-    {
-      Tim7_flag_60ms = 0;
-      gt911_Scanf();
-    }*/
-		   
-        // if (ring_buffer_get(&uart_rx_ring_buffer, &received_data) == 0) {
-        //      command_parsing(&received_data);//parse command
-           
-        // }
         UART_RX_TypeDef *frameData = RingQueue_Pop(&uartRingQueue); // 从环形队列取出数�???
         if (frameData != NULL) {
             Serial_data_stream_parsing(frameData); // 解析数据�???
         }
 		
-    //HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_14);
-// ����ѭ���м��ʱ��???
+    HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_15);
 if (HAL_GetTick() - save_picture_time >= 1000) {
-    // ���ض���
    lv_obj_add_flag(ui_Image107,
                    LV_OBJ_FLAG_HIDDEN); /// Flags
 }
 work_flinsh();
-// �?查是否超�? 3 秒且尚未发�?�消�?
         if ((HAL_GetTick() - start_time >= 1000) && !message_sent) {
         screenstart();  // 发�?�一次消�?
             message_sent = 1;           // 设置标志，防止重复发�?
         }
-
-		
 	}
   /* USER CODE END 3 */
 }

@@ -133,17 +133,50 @@ void GT911_Software_Reset(void)
 
     //printf("✔️ GT911 软件复位完成\n");
 }
+ // 初始化 GT911 时，控制 INT 引脚 PG7
+void GT911_INT_LOW_and_OUTPUT(void)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    GPIO_InitStruct.Pin = GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+    HAL_GPIO_WritePin(GPIOG, GPIO_PIN_7, GPIO_PIN_RESET); // 拉低 INT
+}
+
+void GT911_INT_INPUT_MODE(void)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    GPIO_InitStruct.Pin = GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct); // 设置为输入模式
+}
 void GT911_Init(void)
 {
-    uint8_t mode = 1;
+	
+	 uint8_t mode = 1;
     uint8_t config[186];  // GT911 配置数据
-GT911_Software_Reset();
+
+	GT911_INT_LOW_and_OUTPUT();
     // 1. 复位 GT911
     GT_RESET_LOW();  
-    HAL_Delay(10);
+    HAL_Delay(20);
     GT_RESET_HIGH();
-    HAL_Delay(50);
-
+    HAL_Delay(60);
+	GT911_INT_INPUT_MODE();
+	GT911_Software_Reset();
+	HAL_Delay(50);
+	uint8_t clear = 0;
+	GT911_WriteReg(0x814E, &clear, 1);
+	GT911_WriteReg(0x814E, &clear, 1);
+	GT911_WriteReg(0x814E, &clear, 1);
+	HAL_NVIC_SetPriority(EXTI9_5_IRQn, 7, 0);
+HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
  //GT911_SetInterruptMode(3);
 }

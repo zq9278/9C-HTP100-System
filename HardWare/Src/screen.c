@@ -252,6 +252,7 @@ void processData(PCTRL_MSG msg) {
     //    }
         EYE_status=1;
     } else {
+			work_mode=0;
 			create_global_panel();
 			EYE_status=0;
 			 lv_obj_t * current_screen = lv_scr_act();

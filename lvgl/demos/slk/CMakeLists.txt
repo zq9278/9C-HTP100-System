@@ -65,7 +65,6 @@ SET(SOURCES components/ui_comp_image10.c
     images/ui_img_save_succeed_png.c
     images/ui_img_set_bee2_png.c
     images/ui_img_set_bee1_png.c
-    images/ui_img_yanduntishi2_png.c
     fonts/ui_font_alibaba30.c
     fonts/ui_font_alibaba40.c
     fonts/ui_font_alibaba10.c
