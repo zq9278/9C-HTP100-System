@@ -1,0 +1,105 @@
+/*
+ *  CMSIS Pack Debug Access Sequence Log
+ *  File        : D:\STM32_CODE\vscode-test\MDK-ARM\H750-clion_Sequences_0001.log
+ *  Created     : 12:13:49 (04/04/2024)
+ *  Device      : STM32H750XBHx
+ *  PDSC File   : C:/Users/zhangqi/AppData/Local/arm/packs/Keil/STM32H7xx_DFP/3.1.1/Keil.STM32H7xx_DFP.pdsc
+ *  Config File : D:\STM32_CODE\vscode-test\MDK-ARM\DebugConfig\lvgl_h750x_STM32H750XBHx_1.1.0.dbgconf
+ *
+ */
+
+[12:13:49.076]  **********  Sequence "DebugDeviceUnlock"  (Context="Connect", Pname="", info="")
+[12:13:49.076]  
+[12:13:49.077]  <debugvars>
+[12:13:49.077]    // Pre-defined
+[12:13:49.078]    __protocol=0x00010002      (Protocol="SWD", SWJ-DP="True")
+[12:13:49.078]    __connection=0x00010202    (Connection Type="Flash", Reset Type="System Reset", Connection Under HW Reset)
+[12:13:49.078]    __dp=0x00000000
+[12:13:49.078]    __ap=0x00000000
+[12:13:49.078]    __traceout=0x00000000      (Trace Disabled)
+[12:13:49.078]    __errorcontrol=0x00000000  (Skip Errors="False")
+[12:13:49.078]    __FlashAddr=0x00000000
+[12:13:49.078]    __FlashLen=0x00000000
+[12:13:49.078]    __FlashArg=0x00000000
+[12:13:49.078]    __FlashOp=0x00000000
+[12:13:49.078]    __Result=0x00000000
+[12:13:49.078]    
+[12:13:49.078]    // User-defined
+[12:13:49.078]    DbgMCU_CR=0x00000007
+[12:13:49.078]    DbgMCU_APB3_Fz1=0x00000000
+[12:13:49.078]    DbgMCU_APB1L_Fz1=0x00000000
+[12:13:49.078]    DbgMCU_APB2_Fz1=0x00000000
+[12:13:49.078]    DbgMCU_APB4_Fz1=0x00000000
+[12:13:49.079]    TraceClk_Pin=0x00040002
+[12:13:49.079]    TraceD0_Pin=0x00040003
+[12:13:49.079]    TraceD1_Pin=0x00040004
+[12:13:49.079]    TraceD2_Pin=0x00040005
+[12:13:49.079]    TraceD3_Pin=0x00040006
+[12:13:49.079]  </debugvars>
+[12:13:49.079]  
+[12:13:49.079]  <sequence name="DebugDeviceUnlock" Pname="" disable="false" info="">
+[12:13:49.079]    <block atomic="false" info="">
+[12:13:49.079]      __var value = 0;
+[12:13:49.079]        // -> [value <= 0x00000000]
+[12:13:49.079]      Sequence("CheckID");
+[12:13:49.079]        <sequence name="CheckID" Pname="" disable="false" info="">
+[12:13:49.079]          <block atomic="false" info="">
+[12:13:49.079]            __var pidr1 = 0;
+[12:13:49.079]              // -> [pidr1 <= 0x00000000]
+[12:13:49.079]            __var pidr2 = 0;
+[12:13:49.079]              // -> [pidr2 <= 0x00000000]
+[12:13:49.080]            __var jep106id = 0;
+[12:13:49.080]              // -> [jep106id <= 0x00000000]
+[12:13:49.080]            __var ROMTableBase = 0;
+[12:13:49.080]              // -> [ROMTableBase <= 0x00000000]
+[12:13:49.080]            __ap = 2;      // System debug access port (APB-AP)
+[12:13:49.080]              // -> [__ap <= 0x00000002]
+[12:13:49.080]            ROMTableBase = ReadAP(0xF8) & ~0x3;
+[12:13:49.080]              // -> [ReadAP(0x000000F8) => 0xE00E0003]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.080]              // -> [ROMTableBase <= 0xE00E0000]
+[12:13:49.080]            pidr1 = Read32(ROMTableBase + 0x0FE4);
+[12:13:49.081]              // -> [Read32(0xE00E0FE4) => 0x00000004]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.081]              // -> [pidr1 <= 0x00000004]
+[12:13:49.081]            pidr2 = Read32(ROMTableBase + 0x0FE8);
+[12:13:49.081]              // -> [Read32(0xE00E0FE8) => 0x0000000A]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.081]              // -> [pidr2 <= 0x0000000A]
+[12:13:49.082]            jep106id = ((pidr2 & 0x7) << 4 ) | ((pidr1 >> 4) & 0xF);
+[12:13:49.082]              // -> [jep106id <= 0x00000020]
+[12:13:49.082]          </block>
+[12:13:49.085]          <control if="jep106id != 0x20" while="" timeout="0" info="">
+[12:13:49.085]            // if-block "jep106id != 0x20"
+[12:13:49.085]              // =>  FALSE
+[12:13:49.085]            // skip if-block "jep106id != 0x20"
+[12:13:49.085]          </control>
+[12:13:49.086]        </sequence>
+[12:13:49.086]      __ap   = 2;                                         // Switch to System Debug Access Port
+[12:13:49.086]        // -> [__ap <= 0x00000002]
+[12:13:49.086]      value  = Read32(0xE00E1004);                        // Read DBGMCU_CR
+[12:13:49.087]        // -> [Read32(0xE00E1004) => 0x00770007]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.087]        // -> [value <= 0x00770007]
+[12:13:49.087]      value |= 0x00670000;                                // set preset values (enable all debug clocks by default)
+[12:13:49.087]        // -> [value <= 0x00770007]
+[12:13:49.087]    </block>
+[12:13:49.087]    <control if="__traceout" while="" timeout="0" info="">
+[12:13:49.087]      // if-block "__traceout"
+[12:13:49.087]        // =>  FALSE
+[12:13:49.087]      // skip if-block "__traceout"
+[12:13:49.087]    </control>
+[12:13:49.087]    <block atomic="false" info="">
+[12:13:49.087]      Write32(0xE00E1004, value);                         // Update DBGMCU_CR
+[12:13:49.087]        // -> [Write32(0xE00E1004, 0x00770007)]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.087]    </block>
+[12:13:49.087]    <block atomic="false" info="DbgMCU registers">
+[12:13:49.087]      Write32(0xE00E1004 , DbgMCU_CR        | value);     // DBGMCU_CR:       Configure MCU Debug
+[12:13:49.088]        // -> [Write32(0xE00E1004, 0x00770007)]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.088]      Write32(0xE00E1034 , DbgMCU_APB3_Fz1         );     // DBGMCU_APB3FZ1:  Configure APB3 peripheral freeze behavior
+[12:13:49.088]        // -> [Write32(0xE00E1034, 0x00000000)]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.088]      Write32(0xE00E103C , DbgMCU_APB1L_Fz1        );     // DBGMCU_APB1LFZ1: Configure APB1L peripheral freeze behavior
+[12:13:49.089]        // -> [Write32(0xE00E103C, 0x00000000)]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.089]      Write32(0xE00E104C , DbgMCU_APB2_Fz1         );     // DBGMCU_APB2FZ1:  Configure APB2 peripheral freeze behavior
+[12:13:49.089]        // -> [Write32(0xE00E104C, 0x00000000)]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.089]      Write32(0xE00E1054 , DbgMCU_APB4_Fz1         );     // DBGMCU_APB4FZ1:  Configure APB4 peripheral freeze behavior
+[12:13:49.089]        // -> [Write32(0xE00E1054, 0x00000000)]   (__dp=0x00000000, __ap=0x00000002)
+[12:13:49.089]    </block>
+[12:13:49.090]  </sequence>
+[12:13:49.090]  

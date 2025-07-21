@@ -1,0 +1,14 @@
+{
+    "files.associations": {
+        "ltdc.h": "c",
+        "fmc.h": "c",
+        "lcd_int.h": "c",
+        "main.h": "c",
+        "touch.h": "c",
+        "ui.h": "c",
+        "lvgl.h": "c",
+        "lv_port_indev_template.h": "c",
+        "lv_port_disp_template.h": "c",
+        "stdbool.h": "c"
+    }
+}
