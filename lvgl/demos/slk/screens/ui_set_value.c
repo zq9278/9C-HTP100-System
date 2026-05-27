@@ -39,10 +39,8 @@ void ui_event_Button11(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_PRESSED) {
-        BEE1(e);
-    }
     if(event_code == LV_EVENT_RELEASED) {
+        BEE1(e);
         press_add(e);
     }
 }
@@ -51,10 +49,8 @@ void ui_event_Button13(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_PRESSED) {
-        BEE1(e);
-    }
     if(event_code == LV_EVENT_RELEASED) {
+        BEE1(e);
         press_sub(e);
     }
 }
@@ -63,10 +59,8 @@ void ui_event_Button14(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_PRESSED) {
-        BEE1(e);
-    }
     if(event_code == LV_EVENT_RELEASED) {
+        BEE1(e);
         time_sub(e);
     }
 }
@@ -75,10 +69,8 @@ void ui_event_Button15(lv_event_t * e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_PRESSED) {
-        BEE1(e);
-    }
     if(event_code == LV_EVENT_RELEASED) {
+        BEE1(e);
         time_add(e);
     }
 }

@@ -28,6 +28,18 @@ typedef struct __attribute__((packed)) {
     uint8_t end_high; // 
     uint8_t end_low;  // 
 } CTRL_MSG, *PCTRL_MSG;
+
+typedef struct __attribute__((packed)) {
+    uint8_t cmd_head_high;
+    uint8_t cmd_head_low;
+    uint8_t frame_length;
+    uint8_t cmd_type_high;
+    uint8_t cmd_type_low;
+    uint32_t value;
+    uint16_t crc;
+    uint8_t end_high;
+    uint8_t end_low;
+} CTRL_MSG_U32, *PCTRL_MSG_U32;
 //recept_data结构体类型，表示一个完整的结构体对象。用 . 访问成员
 //recept_data_p结构体指针类型，表示一个指向recept_data结构体对象的指针。用 -> 访问成员
 //调试结构体
@@ -62,6 +74,7 @@ UART_RX_TypeDef *RingQueue_Pop(RingQueue *queue); // 环形队列出队
 void Serial_data_stream_parsing(UART_RX_TypeDef *frameData);
 void command_parsing(const uint8_t *received_data);
 void processData(PCTRL_MSG msg);
+void processData_u32(PCTRL_MSG_U32 msg);
 void processData_prepare(prepare_data_p msg);
 void work_flinsh(void);
 void  screenstart(void);

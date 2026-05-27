@@ -2,6 +2,7 @@
 #include "ui.h"
 #include "ui-myself.h"
 #include <math.h>
+#include <stdio.h>
 uint8_t EYE_status;
 extern uint8_t work_mode;
 extern TIM_HandleTypeDef htim14;
@@ -36,6 +37,7 @@ extern lv_obj_t *ui_Image100;
 extern lv_obj_t *ui_Image99;
 extern lv_obj_t *ui_Image113;
 extern lv_obj_t *ui_Image95;
+extern lv_obj_t *ui_TextArea42;
 
 uint16_t prepare_temprature, prepare_crimp, prepare_time, bee,
     prepare_set; // 准�?�温度，准�?�挤压�?�数，准备时间，蜂鸣�??，准备�?�置123
@@ -49,6 +51,7 @@ static uint16_t pulsation_pressure = 0;
 static uint16_t auto_pressure = 0;
 static uint8_t battery_percent = 0;
 static uint8_t battery_percent_valid = 0;
+static uint32_t software_version = 20241226UL;
 
 static int16_t temp_to_tenths(float_t value) {
   float_t scaled = value * 10.0f;
@@ -84,11 +87,24 @@ static void set_pressure_label(lv_obj_t *label, uint16_t value) {
   }
 }
 
+static void set_version_text(void) {
+  char version_text[16];
+
+  if (ui_TextArea42 == NULL) {
+    return;
+  }
+
+  snprintf(version_text, sizeof(version_text), "%lu",
+           (unsigned long)software_version);
+  lv_textarea_set_text(ui_TextArea42, version_text);
+}
+
 void screen_refresh_runtime_ui(void) {
   set_temperature_label(ui_Label30, hot_temperature_tenths);
   set_temperature_label(ui_Label39, auto_temperature_tenths);
   set_pressure_label(ui_Label32, pulsation_pressure);
   set_pressure_label(ui_Label46, auto_pressure);
+  set_version_text();
 
   if (!battery_percent_valid) {
     return;
@@ -174,7 +190,12 @@ void command_parsing(
   // 解析命令
   switch (cmd_type) {
   case 0x5aa5: { // 命令类型 0x9000 - 处理 UART1 数据
-    processData((PCTRL_MSG)received_data); // process data from uart
+    uint16_t message_type = ((uint16_t)received_data[3] << 8) | received_data[4];
+    if (message_type == 0x2060U) {
+      processData_u32((PCTRL_MSG_U32)received_data);
+    } else {
+      processData((PCTRL_MSG)received_data); // process data from uart
+    }
     break;
   }
   case 0x6aa6: { // 命令类型 0x6aa6 - 处理 UART1 数据
@@ -313,6 +334,20 @@ lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);  // 让 panel 可见
     break;
   }
 }
+
+void processData_u32(PCTRL_MSG_U32 msg) {
+  uint16_t cmd_type = ((msg->cmd_type_high) << 8) | (msg->cmd_type_low);
+
+  switch (cmd_type) {
+  case 0x2060:
+    software_version = msg->value;
+    screen_refresh_runtime_ui();
+    break;
+  default:
+    break;
+  }
+}
+
 void processData_prepare(prepare_data_p msg) {
   uint16_t cmd_head = ((msg->cmd_head_high) << 8) |
                       (msg->cmd_head_low); // 将两�??8位值合并成一�??16位�?
@@ -440,17 +475,14 @@ void processData_prepare(prepare_data_p msg) {
     break;
   case 0x00A7: // bee
     bee = data;
-    if (bee == 1) {
-      lv_obj_add_flag(ui_Image113,
-                      LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// Flags
-      lv_obj_clear_flag(ui_Image95, LV_OBJ_FLAG_HIDDEN);
-      HAL_GPIO_WritePin(Bee_vcc_GPIO_Port, Bee_vcc_Pin, GPIO_PIN_SET);
-
-    } else {
-      lv_obj_add_flag(ui_Image95,
-                      LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// Flags
-      lv_obj_clear_flag(ui_Image113, LV_OBJ_FLAG_HIDDEN);
-      HAL_GPIO_WritePin(Bee_vcc_GPIO_Port, Bee_vcc_Pin, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(Bee_vcc_GPIO_Port, Bee_vcc_Pin,
+                      bee == 1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    ui_lang_apply_bee_state();
+    break;
+  case 0x00AB: // language
+    if (data <= 1U) {
+      ui_lang_set(data);
+      screen_refresh_runtime_ui();
     }
     break;
   default:

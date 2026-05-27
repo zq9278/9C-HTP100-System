@@ -31,6 +31,22 @@ volatile uint8_t work_mode =
     0; // 0:娌″伐浣溿€?1锛氱儹鏁枫€?2锛氳剦鍐层€?3锛氳嚜鍔?
 #define LIMIT(x, min, max)                                                     \
   ((x) = (((x) <= (min)) ? (min) : (((x) >= (max)) ? (max) : (x))))
+
+static void send_prepare_command(uint16_t cmd_type, uint16_t value) {
+  volatile static AXI_SRAM prepare_data pData;
+
+  pData.cmd_head_high = 0x6A;
+  pData.cmd_head_low = 0xA6;
+  pData.frame_length = 0x0b;
+  pData.cmd_type_high = (uint8_t)(cmd_type >> 8);
+  pData.cmd_type_low = (uint8_t)(cmd_type & 0xFF);
+  pData.value = value;
+  pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
+  pData.end_high = 0xff;
+  pData.end_low = 0xff;
+  UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
+}
+
 void BEE1(lv_event_t *e) {
   // Your code here
   // HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_RESET);
@@ -542,11 +558,11 @@ void bee_set_off(lv_event_t *e) {
 }
 void language_set_zh(lv_event_t *e) {
   BEE1(e);
-  ui_lang_set(UI_LANG_ZH);
+  send_prepare_command(0x1060U, UI_LANG_ZH);
 }
 void language_set_en(lv_event_t *e) {
   BEE1(e);
-  ui_lang_set(UI_LANG_EN);
+  send_prepare_command(0x1060U, UI_LANG_EN);
 }
 void press_add(lv_event_t *e) {
   int current_value = atoi(lv_label_get_text(ui_Label6));
