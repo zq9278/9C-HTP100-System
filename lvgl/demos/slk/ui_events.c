@@ -23,6 +23,7 @@ extern int value3;
 extern int value4;
 extern uint8_t usart1_tx;
 extern uint16_t prepare_set, bee, prepare_time, prepare_crimp;
+uint16_t language = UI_LANG_ZH;
 static lv_obj_t *global_img = NULL;  // 全局图片对象
 static lv_obj_t *global_img2 = NULL;  // 全局图片对象
 // extern DMA_HandleTypeDef hdma_usart1_tx;
@@ -37,6 +38,7 @@ void BEE1(lv_event_t *e) {
   // HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_SET);
   if (bee) {
 		HAL_GPIO_WritePin(GPIOH, GPIO_PIN_15, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_RESET);
     HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);
 		__HAL_TIM_CLEAR_FLAG(&htim13, TIM_FLAG_UPDATE); // 清除可能存在的更新中断标志,否则第一次就会进中断
     HAL_TIM_Base_Start_IT(&htim13);//关闭比比响
@@ -541,6 +543,14 @@ void bee_set_off(lv_event_t *e) {
   pData.end_low = 0xff;  // 甯у熬
   // SCB_CleanInvalidateDCache();
   UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
+}
+void language_set_zh(lv_event_t *e) {
+  BEE1(e);
+  ui_lang_set(UI_LANG_ZH);
+}
+void language_set_en(lv_event_t *e) {
+  BEE1(e);
+  ui_lang_set(UI_LANG_EN);
 }
 void press_add(lv_event_t *e) {
   int current_value = atoi(lv_label_get_text(ui_Label6));

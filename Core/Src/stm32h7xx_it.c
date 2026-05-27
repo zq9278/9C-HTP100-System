@@ -46,7 +46,7 @@
 /* USER CODE BEGIN PV */
 #define LVGL_MemoryAdd1 ((uint32_t)0xC0000000)
 #define LVGL_MemoryAdd2 (LVGL_MemoryAdd1 + 480 * 640 * 2)
-#define LVGL_MemoryAdd3 (LVGL_MemoryAdd2 + 480 * 640 * 2) // 显示缓冲区地�?????
+#define LVGL_MemoryAdd3 (LVGL_MemoryAdd2 + 480 * 640 * 2) // 显示缓冲区地�?????
 extern bool lv_disp_updated;
 static uint16_t counter = 0; // ��???���������ڼ����жϴ���
 static uint16_t INT = 0;     // ��???���������ڼ����жϴ���
@@ -440,17 +440,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if ((Tim7Cnt & 0x02) == 0x02) // �����ξ�?????40����
     {
       Tim7_flag_40ms = 1;
-      // Tim7Cnt = 0; // �����????????
+      // Tim7Cnt = 0; // �����????????
     }
     if ((Tim7Cnt & 0x03) == 0x03) // �����ξ�?????40����
     {
       Tim7_flag_60ms = 1;
-      // Tim7Cnt = 0; // �����????????
+      // Tim7Cnt = 0; // �����????????
     }
     if ((Tim7Cnt & 0x05) == 0x05) // �����ξ�?????40����
     {
       Tim7_flag_100ms = 1;
-      //Tim7Cnt = 0; // �����????????
+      //Tim7Cnt = 0; // �����????????
     }
 		if (Tim7Cnt >= 35) // ÿ50��20ms���ڵ���1��
         {
@@ -547,7 +547,7 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
         __HAL_RCC_I2C1_CLK_DISABLE();// 关闭 I2C 时钟
         //osDelay(10);// 短暂延时
         __HAL_RCC_I2C1_CLK_ENABLE(); // 重新使能 I2C 时钟
-        HAL_I2C_DeInit(&hi2c4);// 重新初始�? I2C 外设
+        HAL_I2C_DeInit(&hi2c4);// 重新初始�? I2C 外设
         HAL_I2C_Init(&hi2c4);
     }}
 /* USER CODE END 1 */

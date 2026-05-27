@@ -56,6 +56,10 @@
 	//#define LV_MEM_ADR (0x24000000)     /*0: unused*/
    // #define LV_MEM_ADR 0     /*0: unused*/
     /*Instead of an address give a memory allocator that will be called to get a memory pool for LVGL. E.g. my_malloc*/
+    #ifdef LV_SIMULATOR_DESKTOP
+        #undef LV_MEM_ADR
+        #define LV_MEM_ADR 0
+    #endif
     #if LV_MEM_ADR == 0
         #undef LV_MEM_POOL_INCLUDE
         #undef LV_MEM_POOL_ALLOC
@@ -183,6 +187,10 @@
 
 /*Use STM32's DMA2D (aka Chrom Art) GPU*/
 #define LV_USE_GPU_STM32_DMA2D 1
+#ifdef LV_SIMULATOR_DESKTOP
+#undef LV_USE_GPU_STM32_DMA2D
+#define LV_USE_GPU_STM32_DMA2D 0
+#endif
 #if LV_USE_GPU_STM32_DMA2D
     /*Must be defined to include path of CMSIS header of target processor
     e.g. "stm32f7xx.h" or "stm32f4xx.h"*/
@@ -390,7 +398,7 @@
 #define LV_FONT_MONTSERRAT_12_SUBPX      0
 #define LV_FONT_MONTSERRAT_28_COMPRESSED 0  /*bpp = 3*/
 #define LV_FONT_DEJAVU_16_PERSIAN_HEBREW 0  /*Hebrew, Arabic, Persian letters and all their forms*/
-#define LV_FONT_SIMSUN_16_CJK            0  /*1000 most common CJK radicals*/
+#define LV_FONT_SIMSUN_16_CJK            1  /*1000 most common CJK radicals*/
 
 /*Pixel perfect monospace fonts*/
 #define LV_FONT_UNSCII_8  0

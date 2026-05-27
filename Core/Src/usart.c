@@ -24,9 +24,9 @@
 #include <stdio.h>
 #include "screen.h"
 
-RingQueue uartRingQueue = { .head = 0, .tail = 0, .count = 0 }; // 初始化队�????
-AXI_SRAM UART_RX_TypeDef uart_rx_data_t[UART_BUFFER_QUANTITY]; // 双缓冲数据存�????
-volatile uint8_t uart_buff_ctrl = 0; // 缓冲区索�????
+RingQueue uartRingQueue = { .head = 0, .tail = 0, .count = 0 }; // 初始化队�????
+AXI_SRAM UART_RX_TypeDef uart_rx_data_t[UART_BUFFER_QUANTITY]; // 双缓冲数据存�????
+volatile uint8_t uart_buff_ctrl = 0; // 缓冲区索�????
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;
@@ -74,8 +74,8 @@ void MX_USART1_UART_Init(void)
   }
   /* USER CODE BEGIN USART1_Init 2 */
   SCB_CleanInvalidateDCache();
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_data_t[uart_buff_ctrl].buffer, UART_RX_BUFFER_SIZE); // �????启DMA接收
-    // 启动空闲中断接收 (可�?�，增强接收能力)
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_data_t[uart_buff_ctrl].buffer, UART_RX_BUFFER_SIZE); // �????启DMA接收
+    // 启动空闲中断接收 (可�?�，增强接收能力)
     __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
   /* USER CODE END USART1_Init 2 */
 
@@ -109,16 +109,9 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     PA10     ------> USART1_RX
     PA9     ------> USART1_TX
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_10;
+    GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_9;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
-    GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = GPIO_PIN_9;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
     GPIO_InitStruct.Alternate = GPIO_AF7_USART1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -205,12 +198,12 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 // }
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-   if (huart->Instance == USART1) { // 确保�???? USART1
+   if (huart->Instance == USART1) { // 确保�???? USART1
         if (Size > 0 && Size <= UART_RX_BUFFER_SIZE) {
             uart_rx_data_t[uart_buff_ctrl].size = Size; // 存储接收数据长度
             UART_RX_TypeDef *pUartData = &uart_rx_data_t[uart_buff_ctrl]; // 取当前缓冲区数据
             RingQueue_Push(&uartRingQueue, pUartData); // 数据存入环形队列
-            uart_buff_ctrl = (uart_buff_ctrl + 1) % UART_BUFFER_QUANTITY; // 切换到下�????个缓冲区
+            uart_buff_ctrl = (uart_buff_ctrl + 1) % UART_BUFFER_QUANTITY; // 切换到下�????个缓冲区
         }
 				SCB_CleanInvalidateDCache();
         HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_data_t[uart_buff_ctrl].buffer, UART_RX_BUFFER_SIZE); // 重新启动DMA接收
@@ -221,7 +214,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART1) {
       HAL_UART_Abort(huart);
 			SCB_CleanInvalidateDCache();
-       HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_data_t[uart_buff_ctrl].buffer, UART_RX_BUFFER_SIZE); // �????启DMA接收
+       HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_data_t[uart_buff_ctrl].buffer, UART_RX_BUFFER_SIZE); // �????启DMA接收
        HAL_GPIO_WritePin(GPIOH, GPIO_PIN_14, GPIO_PIN_RESET);
     }
 }
@@ -233,3 +226,4 @@ int fputc(int ch,FILE *f)//重定向printf
 }
 
 /* USER CODE END 1 */
+

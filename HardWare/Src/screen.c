@@ -1,6 +1,7 @@
 #include "screen.h"
 #include "ui.h"
 #include "ui-myself.h"
+#include <math.h>
 uint8_t EYE_status;
 extern uint8_t work_mode;
 extern TIM_HandleTypeDef htim14;
@@ -41,6 +42,69 @@ uint16_t prepare_temprature, prepare_crimp, prepare_time, bee,
 uint8_t work_finish = 0; // 0 没结束，1 工作完成
 extern uint8_t usart1_tx;
 extern UART_HandleTypeDef huart1;
+
+static int16_t hot_temperature_tenths = 0;
+static int16_t auto_temperature_tenths = 0;
+static uint16_t pulsation_pressure = 0;
+static uint16_t auto_pressure = 0;
+static uint8_t battery_percent = 0;
+static uint8_t battery_percent_valid = 0;
+
+static int16_t temp_to_tenths(float_t value) {
+  float_t scaled = value * 10.0f;
+  return (int16_t)(scaled >= 0.0f ? scaled + 0.5f : scaled - 0.5f);
+}
+
+static void set_temperature_label(lv_obj_t *label, int16_t tenths) {
+  int16_t abs_value = tenths < 0 ? -tenths : tenths;
+  int16_t whole = abs_value / 10;
+  int16_t fraction = abs_value % 10;
+
+  if (label == NULL) {
+    return;
+  }
+
+  if (tenths < 0) {
+    lv_label_set_text_fmt(label, "-%d.%d", whole, fraction);
+  } else {
+    lv_label_set_text_fmt(label, "%d.%d", whole, fraction);
+  }
+}
+
+static void set_pressure_label(lv_obj_t *label, uint16_t value) {
+  if (label == NULL) {
+    return;
+  }
+
+  lv_label_set_text_fmt(label, "%03d", (int)value);
+  if (value >= 247U) {
+    lv_obj_set_style_text_color(label, lv_color_make(255, 0, 0), 0);
+  } else {
+    lv_obj_set_style_text_color(label, lv_color_make(255, 255, 255), 0);
+  }
+}
+
+void screen_refresh_runtime_ui(void) {
+  set_temperature_label(ui_Label30, hot_temperature_tenths);
+  set_temperature_label(ui_Label39, auto_temperature_tenths);
+  set_pressure_label(ui_Label32, pulsation_pressure);
+  set_pressure_label(ui_Label46, auto_pressure);
+
+  if (!battery_percent_valid) {
+    return;
+  }
+
+  if (ui_Slider1 != NULL) lv_slider_set_value(ui_Slider1, battery_percent, LV_ANIM_ON);
+  if (ui_Label5 != NULL) lv_label_set_text_fmt(ui_Label5, "%d%%", (int)battery_percent);
+  if (ui_Slider2 != NULL) lv_slider_set_value(ui_Slider2, battery_percent, LV_ANIM_ON);
+  if (ui_Slider3 != NULL) lv_slider_set_value(ui_Slider3, battery_percent, LV_ANIM_ON);
+  if (ui_Slider9 != NULL) lv_slider_set_value(ui_Slider9, battery_percent, LV_ANIM_ON);
+  if (ui_Slider5 != NULL) lv_slider_set_value(ui_Slider5, battery_percent, LV_ANIM_ON);
+  if (ui_Slider6 != NULL) lv_slider_set_value(ui_Slider6, battery_percent, LV_ANIM_ON);
+  if (ui_Slider7 != NULL) lv_slider_set_value(ui_Slider7, battery_percent, LV_ANIM_ON);
+  if (ui_Slider8 != NULL) lv_slider_set_value(ui_Slider8, battery_percent, LV_ANIM_ON);
+}
+
 void work_flinsh(void) {
   if (work_finish) {
 	work_finish=0;
@@ -97,7 +161,7 @@ void work_flinsh(void) {
 }
 
 void command_parsing(
-    UART_RX_TypeDef *received_data) { // 区分调试命令和屏幕工作命�??
+    const uint8_t *received_data) { // 区分调试命令和屏幕工作命�??
   // �??认帧尾是否合�??
   // if (received_data->buffer[received_data->length - 2] != 0xFF ||
   //     received_data->buffer[received_data->length - 1] != 0xFF) {
@@ -105,17 +169,17 @@ void command_parsing(
   // }
   // 提取命令类型（高字节和低字节�??
   uint16_t cmd_type =
-      (received_data->buffer[0] << 8) |
-      received_data->buffer[1]; // �??一位和�??二位判断�??不是调试参数
+      (received_data[0] << 8) |
+      received_data[1]; // �??一位和�??二位判断�??不是调试参数
   // 解析命令
   switch (cmd_type) {
   case 0x5aa5: { // 命令类型 0x9000 - 处理 UART1 数据
-    processData((PCTRL_MSG)received_data->buffer); // process data from uart
+    processData((PCTRL_MSG)received_data); // process data from uart
     break;
   }
   case 0x6aa6: { // 命令类型 0x6aa6 - 处理 UART1 数据
     processData_prepare(
-        (prepare_data_p)received_data->buffer); // process data from uart
+        (prepare_data_p)received_data); // process data from uart
     HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_15);
     break;
   }
@@ -135,43 +199,25 @@ void processData(PCTRL_MSG msg) {
   switch (cmd_type) {
 
   case 0x2041:                                       // 开始热�??
-    lv_label_set_text_fmt(ui_Label30, "%.1f", data); // 显示温度
+    hot_temperature_tenths = temp_to_tenths(data);
+    screen_refresh_runtime_ui();
     break;
   case 0x2005: // 开始脉�??
-    // int data_int = data;
-    lv_label_set_text_fmt(ui_Label32, "%03d", (int)data); // 显示压力
-     // 根据压力值设置颜色
-    if (data > 247.66) {
-        lv_obj_set_style_text_color(ui_Label32, lv_color_make(255, 0, 0), 0); // 红色
-    } else {
-        lv_obj_set_style_text_color(ui_Label32, lv_color_make(255, 255, 255), 0); // 白色
-    }
+    pulsation_pressure = (uint16_t)data;
+    screen_refresh_runtime_ui();
     break;
   case 0x2037:                                       // �??动开始热�??
-    lv_label_set_text_fmt(ui_Label39, "%.1f", data); // 显示温度
+    auto_temperature_tenths = temp_to_tenths(data);
+    screen_refresh_runtime_ui();
     break;
   case 0x2047: // �??动开始脉�??
-               // int data_int = data;
-    lv_label_set_text_fmt(ui_Label46, "%03d", (int)data); // 显示压力
-     // 根据压力值设置颜色
-    if (data > 247.66) {
-        lv_obj_set_style_text_color(ui_Label46, lv_color_make(255, 0, 0), 0); // 红色
-    } else {
-        lv_obj_set_style_text_color(ui_Label46, lv_color_make(255, 255, 255), 0); // 白色
-    }
+    auto_pressure = (uint16_t)data;
+    screen_refresh_runtime_ui();
     break;
   case 0x2050: // 跟新电池
-               // sprintf(buffer, "%d%%", (int)data);
-    lv_slider_set_value(ui_Slider1, (int)data, LV_ANIM_ON);
-    lv_label_set_text_fmt(ui_Label5, "%d%%", (int)data); // 电池图标数显
-    // lv_label_ins_text(ui_Label5, 0, buffer);
-    lv_slider_set_value(ui_Slider2, (int)data, LV_ANIM_ON);
-    lv_slider_set_value(ui_Slider3, (int)data, LV_ANIM_ON);
-    lv_slider_set_value(ui_Slider9, (int)data, LV_ANIM_ON);
-    lv_slider_set_value(ui_Slider5, (int)data, LV_ANIM_ON);
-    lv_slider_set_value(ui_Slider6, (int)data, LV_ANIM_ON);
-    lv_slider_set_value(ui_Slider7, (int)data, LV_ANIM_ON);
-    lv_slider_set_value(ui_Slider8, (int)data, LV_ANIM_ON);
+    battery_percent = (uint8_t)data;
+    battery_percent_valid = 1;
+    screen_refresh_runtime_ui();
     break;
   case 0x2051: // 主机发送停�??            
     HAL_TIM_Base_Stop_IT(&htim14);
@@ -246,39 +292,22 @@ void processData(PCTRL_MSG msg) {
   //if(global_panel != NULL){
 	 if (data == 1.0) {
         // **只有当 global_panel 不是隐藏状态时，才执行隐藏**
-     //   if (!lv_obj_has_flag(global_panel, LV_OBJ_FLAG_HIDDEN)) {
-    //        lv_obj_add_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
-		//		
-    //    }
+        //if (!lv_obj_has_flag(global_panel, LV_OBJ_FLAG_HIDDEN)) {
+					if (global_panel != NULL) {
+            lv_obj_add_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
+				
+        }
         EYE_status=1;
     } else {
+_ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
 			work_mode=0;
 			create_global_panel();
 			EYE_status=0;
-			 lv_obj_t * current_screen = lv_scr_act();
-
-    // 这些界面不创建 global_panel
-    if (!(current_screen == ui_Power_on_interface ||
-        current_screen == ui_home_page ||
-        current_screen == ui_test ||
-        current_screen == ui_setting ||
-        current_screen == ui_pre_setting ||
-        current_screen == ui_set_value ||
-        current_screen == ui_bee_setting ||
-        current_screen == ui_count ||
-		current_screen == ui_dev_model ||
-        current_screen == ui_count_model ||
-        current_screen == ui_Factorymode) )
-		{
-			//不在这些界面下时清除，打开显示
-			if(lv_obj_has_flag(global_panel, LV_OBJ_FLAG_HIDDEN)) { // **只有当 global_panel 处于隐藏状态时，才执行显示**
-            lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
-        }
-    }
+lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);  // 让 panel 可见
        
 	}
 	
-//	}
+
     break;
   default:
     break;
@@ -466,64 +495,6 @@ uint16_t Calculate_CRC(uint8_t *data, uint16_t length) {
   return crc; // 返回计算结果
 }
 
-// void Serial_data_stream_parsing(UART_RX_TypeDef *frameData) {
-//     if (frameData == NULL) return;
-
-//     uint16_t i = 0;
-//     while (i < frameData->size - 1) {
-//         if ((frameData->buffer[i] == FRAME_HEADER_BYTE1 &&
-//         frameData->buffer[i + 1] == FRAME_HEADER_BYTE2) ||
-//             (frameData->buffer[i] == 0x6A && frameData->buffer[i + 1] ==
-//             0xA6)) {
-
-//             uint16_t frame_start = i;
-//             uint8_t frame_found = 0;
-
-//             for (uint16_t j = i + 2; j < frameData->size - 1; j++) {
-//                 if (frameData->buffer[j] == FRAME_TAIL_BYTE1 &&
-//                 frameData->buffer[j + 1] == FRAME_TAIL_BYTE2) {
-//                     uint16_t frame_size = j - frame_start + 2;
-
-//                     if (frame_size > UART_RX_BUFFER_SIZE) break;
-
-//                     uint16_t received_crc = (frameData->buffer[j - 2] |
-//                     (frameData->buffer[j - 1] << 8)); uint16_t calculated_crc
-//                     = Calculate_CRC(&frameData->buffer[frame_start],
-//                     frame_size - 4);
-
-//                     if (calculated_crc == received_crc) {
-
-//                         // 打印帧数据
-//                         printf("帧解析成功: ");
-//                         for (uint16_t k = frame_start; k <= j + 1; k++) {
-//                             printf("%02X ", frameData->buffer[k]);
-//                         }
-//                         printf("\n");
-
-//                         // 命令解析
-//                         command_parsing(&frameData->buffer[frame_start]);
-
-//                         // 跳过当前帧
-//                         i = j + 2; // 直接跳到帧尾之后
-//                         frame_found = 1;
-//                         break;
-//                     } else {
-//                         printf("Error: CRC mismatch\n");
-//                         i = j + 2; // 跳过错误帧
-//                         frame_found = 1;
-//                         break;
-//                     }
-//                 }
-//             }
-
-//             // 若未找到帧尾，则退出避免死循环
-//             if (!frame_found) break;
-
-//         } else {
-//             i++;  // 当前不是帧头，继续搜索
-//         }
-//     }
-// }
 
 void Serial_data_stream_parsing(UART_RX_TypeDef *frameData) {
   if (frameData == NULL) {
@@ -623,212 +594,3 @@ void screenack(void) {
   pData.end_low = 0xFF;
   UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
 }
-
-/*
-
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <time.h>
-
-#define FRAME_HEADER_BYTE1 0x5A
-#define FRAME_HEADER_BYTE2 0xA5
-#define FRAME_TAIL_BYTE1   0xFF
-#define FRAME_TAIL_BYTE2   0xFF
-#define MAX_FRAME_SIZE     256
-#define MAX_RETRY          3
-#define ACK_CMD            0xFFFF
-#define NACK_CMD           0xFFFE
-#define ACK_TIMEOUT_MS     1000  // 超时时间 (ms)
-
-// 数据类型
-typedef enum {
-    DATA_TYPE_INT32 = 0x01,
-    DATA_TYPE_FLOAT = 0x02,
-    DATA_TYPE_STRING = 0x03,
-    DATA_TYPE_UINT16 = 0x04
-} DataType_t;
-
-// 状态机状态
-typedef enum {
-    WAIT_HEADER,
-    READ_HEADER,
-    READ_DATA,
-    VERIFY_CRC,
-    FRAME_DONE
-} FrameState_t;
-
-// 接收解析结构体
-typedef struct {
-    uint8_t buffer[MAX_FRAME_SIZE];
-    uint16_t index;
-    uint8_t data_length;
-    FrameState_t state;
-} FrameParser_t;
-
-// CRC16 (Modbus) 计算
-uint16_t Calculate_CRC(uint8_t *data, uint16_t len) {
-    uint16_t crc = 0xFFFF;
-    for (uint16_t i = 0; i < len; i++) {
-        crc ^= data[i];
-        for (uint8_t j = 0; j < 8; j++) {
-            crc = (crc & 0x0001) ? (crc >> 1) ^ 0xA001 : (crc >> 1);
-        }
-    }
-    return crc;
-}
-
-// 模拟串口发送
-void UART_SendBytes(uint8_t *data, uint16_t length) {
-    printf("🚀 发送: ");
-    for (uint16_t i = 0; i < length; i++) printf("%02X ", data[i]);
-    printf("\n");
-}
-
-// 生成ACK帧
-void send_ack(uint16_t cmd) {
-    uint8_t ack_frame[10] = {
-        FRAME_HEADER_BYTE1, FRAME_HEADER_BYTE2,
-        (uint8_t)(cmd & 0xFF), (uint8_t)((cmd >> 8) & 0xFF),
-        0x00, 0x00,  // 无数据
-        0x00, 0x00,  // CRC占位
-        FRAME_TAIL_BYTE1, FRAME_TAIL_BYTE2
-    };
-    uint16_t crc = Calculate_CRC(ack_frame, 6);
-    ack_frame[6] = crc & 0xFF;
-    ack_frame[7] = (crc >> 8) & 0xFF;
-
-    UART_SendBytes(ack_frame, sizeof(ack_frame));
-}
-
-// 模拟等待ACK (接收模拟)
-int wait_for_ack(uint16_t expected_cmd) {
-    clock_t start = clock();
-    while ((clock() - start) * 1000 / CLOCKS_PER_SEC < ACK_TIMEOUT_MS) {
-        // 模拟接收ACK成功
-        return 1;
-    }
-    return 0;  // 超时
-}
-
-// 发送数据并等待ACK
-void send_with_ack(uint8_t *frame, uint16_t length, uint16_t cmd) {
-    int retry = 0;
-    while (retry < MAX_RETRY) {
-        UART_SendBytes(frame, length);
-        printf("⏳ 等待ACK...\n");
-
-        if (wait_for_ack(cmd)) {
-            printf("✅ 收到ACK！\n");
-            return;
-        }
-
-        retry++;
-        printf("⚠️ 未收到ACK，重试 (%d/%d)\n", retry, MAX_RETRY);
-    }
-    printf("❌ 超过最大重试次数，发送失败！\n");
-}
-
-// 多帧粘连解析
-void Serial_data_stream_parsing(FrameParser_t *parser, uint8_t *stream, uint16_t
-length) { for (uint16_t i = 0; i < length; i++) { uint8_t byte = stream[i];
-        switch (parser->state) {
-            case WAIT_HEADER:
-                if (byte == FRAME_HEADER_BYTE1) {
-                    parser->buffer[0] = byte;
-                    parser->index = 1;
-                    parser->state = READ_HEADER;
-                }
-                break;
-
-            case READ_HEADER:
-                parser->buffer[parser->index++] = byte;
-                if (parser->index == 2) {
-                    parser->state = (byte == FRAME_HEADER_BYTE2) ? READ_DATA :
-WAIT_HEADER;
-                }
-                break;
-
-            case READ_DATA:
-                parser->buffer[parser->index++] = byte;
-                if (parser->index == 5) {
-                    parser->data_length = parser->buffer[4];
-                    if (parser->data_length > (MAX_FRAME_SIZE - 9))
-parser->state = WAIT_HEADER;
-                }
-                if (parser->index >= (6 + parser->data_length + 4))
-parser->state = VERIFY_CRC; break;
-
-            case VERIFY_CRC: {
-                uint16_t received_crc = parser->buffer[parser->index - 4] |
-(parser->buffer[parser->index - 3] << 8); uint16_t calculated_crc =
-Calculate_CRC(parser->buffer, parser->index - 4);
-
-                if (received_crc == calculated_crc &&
-                    parser->buffer[parser->index - 2] == FRAME_TAIL_BYTE1 &&
-                    parser->buffer[parser->index - 1] == FRAME_TAIL_BYTE2) {
-                    parser->state = FRAME_DONE;
-                } else {
-                    printf("❌ CRC错误，丢弃帧\n");
-                    parser->state = WAIT_HEADER;
-                }
-                break;
-            }
-
-            case FRAME_DONE: {
-                uint16_t cmd = parser->buffer[2] | (parser->buffer[3] << 8);
-                printf("✅ 已接收命令: 0x%04X\n", cmd);
-                send_ack(cmd);  // 发送ACK
-                parser->state = WAIT_HEADER;
-                parser->index = 0;
-                break;
-            }
-        }
-    }
-}
-
-// 构建数据帧
-uint16_t build_frame(uint8_t *frame, uint16_t cmd, uint8_t data_type, uint8_t
-*data, uint8_t data_len) { frame[0] = FRAME_HEADER_BYTE1; frame[1] =
-FRAME_HEADER_BYTE2; frame[2] = cmd & 0xFF; frame[3] = (cmd >> 8) & 0xFF;
-    frame[4] = data_len;
-    frame[5] = data_type;
-    memcpy(&frame[6], data, data_len);
-
-    uint16_t crc = Calculate_CRC(frame, 6 + data_len);
-    frame[6 + data_len] = crc & 0xFF;
-    frame[7 + data_len] = (crc >> 8) & 0xFF;
-    frame[8 + data_len] = FRAME_TAIL_BYTE1;
-    frame[9 + data_len] = FRAME_TAIL_BYTE2;
-
-    return 10 + data_len - 1;
-}
-
-// 主函数测试
-int main() {
-    FrameParser_t parser = {0};
-    parser.state = WAIT_HEADER;
-
-    uint8_t data1[] = {0x00, 0x01};  // uint16: 1
-    uint8_t data2[] = {0x00, 0x02};  // uint16: 2
-
-    uint8_t frame1[MAX_FRAME_SIZE], frame2[MAX_FRAME_SIZE];
-    uint16_t len1 = build_frame(frame1, 0x0101, DATA_TYPE_UINT16, data1,
-sizeof(data1)); uint16_t len2 = build_frame(frame2, 0x0102, DATA_TYPE_UINT16,
-data2, sizeof(data2));
-
-    // 发送并等待ACK
-    send_with_ack(frame1, len1, 0x0101);
-    send_with_ack(frame2, len2, 0x0102);
-
-    printf("\n📥 模拟粘连接收:\n");
-    uint8_t combined_stream[MAX_FRAME_SIZE * 2];
-    memcpy(combined_stream, frame1, len1);
-    memcpy(combined_stream + len1, frame2, len2);
-
-    Serial_data_stream_parsing(&parser, combined_stream, len1 + len2);
-
-    return 0;
-}
-
-*/

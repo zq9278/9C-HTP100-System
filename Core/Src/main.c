@@ -62,9 +62,9 @@ extern uint8_t Tim7_flag_60ms;
 extern uint16_t Tim7_flag_1s;
 extern TIM_HandleTypeDef htim1;
 
-extern RingQueue uartRingQueue; // 初始化队�???
-extern UART_RX_TypeDef uart_rx_data_t[UART_BUFFER_QUANTITY]; // 双缓冲数据存�???
-extern uint8_t uart_buff_ctrl; // 缓冲区索�???
+extern RingQueue uartRingQueue; // 初始化队�???
+extern UART_RX_TypeDef uart_rx_data_t[UART_BUFFER_QUANTITY]; // 双缓冲数据存�???
+extern uint8_t uart_buff_ctrl; // 缓冲区索�???
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -115,7 +115,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  HAL_SYSCFG_AnalogSwitchConfig(SYSCFG_SWITCH_PA0, SYSCFG_SWITCH_PA0_CLOSE); // ��������Ϊģ�⿪�أ���ʵ�ֲ�ͬ�Ĺ��ܡ����磬���Խ���������Ϊģ�����롢ģ���������??????���ӵ��ڲ���ģ��ģ�飨?? ADC��DAC �ȣ��ر� PA0 ����
+  HAL_SYSCFG_AnalogSwitchConfig(SYSCFG_SWITCH_PA0, SYSCFG_SWITCH_PA0_CLOSE); // ��������Ϊģ�⿪�أ���ʵ�ֲ�ͬ�Ĺ��ܡ����磬���Խ���������Ϊģ�����롢ģ���������??????���ӵ��ڲ���ģ��ģ�飨?? ADC��DAC �ȣ��ر� PA0 ����
   HAL_SYSCFG_AnalogSwitchConfig(SYSCFG_SWITCH_PC2, SYSCFG_SWITCH_PC2_CLOSE); // �ر� PC2 ���ӡ�
   /* USER CODE END SysInit */
 
@@ -148,8 +148,8 @@ int main(void)
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
 __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 60);
-	uint8_t message_sent = 0;     // 消息发�?�标�?
-	uint32_t start_time = 0;      // 记录�?机时�?
+	uint8_t message_sent = 0;     // 消息发�?�标�?
+uint32_t start_time = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -157,6 +157,7 @@ __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
   while (1)
   {
     /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
 		HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_14);
 		if(Tim7_flag_1s==1){
@@ -165,10 +166,11 @@ __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
 		}
      //HAL_Delay(90);
      lv_timer_handler();
-        UART_RX_TypeDef *frameData = RingQueue_Pop(&uartRingQueue); // 从环形队列取出数�???
+        UART_RX_TypeDef *frameData = RingQueue_Pop(&uartRingQueue); // 从环形队列取出数�???
         if (frameData != NULL) {
-            Serial_data_stream_parsing(frameData); // 解析数据�???
+            Serial_data_stream_parsing(frameData); // 解析数据�???
         }
+        screen_refresh_runtime_ui();
 		
     HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_15);
 if (HAL_GetTick() - save_picture_time >= 1000) {
@@ -177,8 +179,8 @@ if (HAL_GetTick() - save_picture_time >= 1000) {
 }
 work_flinsh();
         if ((HAL_GetTick() - start_time >= 1000) && !message_sent) {
-        screenstart();  // 发�?�一次消�?
-            message_sent = 1;           // 设置标志，防止重复发�?
+        screenstart();  // 发�?�一次消�?
+            message_sent = 1;           // 设置标志，防止重复发�?
         }
 	}
   /* USER CODE END 3 */
@@ -199,11 +201,6 @@ void SystemClock_Config(void)
 
   /** Configure the main internal regulator output voltage
   */
-  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
-
-  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
-
-  __HAL_RCC_SYSCFG_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
 
   while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
@@ -305,8 +302,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.

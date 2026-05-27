@@ -165,6 +165,12 @@
   * @{
   */
 
+__attribute__((weak)) void ExitRun0Mode(void)
+{
+  /* Some ST startup templates branch here before SystemInit().
+     Provide a no-op default unless a board-specific implementation exists. */
+}
+
 /**
   * @brief  Setup the microcontroller system
   *         Initialize the FPU setting and  vector table location

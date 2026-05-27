@@ -60,12 +60,13 @@ uint16_t Calculate_CRC(uint8_t *data, uint16_t length); // 计算CRC校验值
 int RingQueue_Push(RingQueue *queue, UART_RX_TypeDef *data); // 环形队列入队
 UART_RX_TypeDef *RingQueue_Pop(RingQueue *queue); // 环形队列出队
 void Serial_data_stream_parsing(UART_RX_TypeDef *frameData);
-void command_parsing(UART_RX_TypeDef *received_data);
+void command_parsing(const uint8_t *received_data);
 void processData(PCTRL_MSG msg);
 void processData_prepare(prepare_data_p msg);
 void work_flinsh(void);
 void  screenstart(void);
 void  screenack(void);
+void screen_refresh_runtime_ui(void);
 HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart, uint8_t *data, uint16_t size);
 
 #endif /*__GT911_H_*/

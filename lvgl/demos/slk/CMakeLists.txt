@@ -19,6 +19,7 @@ SET(SOURCES components/ui_comp_image10.c
     screens/ui_count.c
     screens/ui_Factorymode.c
     ui.c
+    ui_lang.c
     components/ui_comp_hook.c
     ui_helpers.c
     ui_events.c

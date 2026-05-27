@@ -1,26 +1,12 @@
 #include "ui.h"
 #include "ui-myself.h"
 lv_obj_t * global_panel;
-//lv_obj_t * global_panel = NULL;  // 确保只有一个 panel 实例
+lv_obj_t * global_panel = NULL;  // 确保只有一个 panel 实例
 
 void create_global_panel() {
 	   // 获取当前活动界面
     lv_obj_t * current_screen = lv_scr_act();
 
-    // 这些界面不创建 global_panel
-    if (current_screen == ui_Power_on_interface ||
-        current_screen == ui_home_page ||
-        current_screen == ui_test ||
-        current_screen == ui_setting ||
-        current_screen == ui_pre_setting ||
-        current_screen == ui_set_value ||
-        current_screen == ui_bee_setting ||
-        current_screen == ui_count ||
-		current_screen == ui_dev_model ||
-        current_screen == ui_count_model ||
-        current_screen == ui_Factorymode) {
-        return;
-    }
 
     if (global_panel != NULL) {
         return;  // 已经创建，不再重复创建
@@ -54,6 +40,17 @@ void create_global_panel() {
     lv_obj_clear_flag(ui_Image81, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
     ui_TextArea30 = lv_textarea_create(ui_Image81);
+		
+		// 创建后追加
+lv_textarea_set_cursor_click_pos(ui_TextArea30, false);     // 点击不定位光标
+lv_obj_clear_state(ui_TextArea30, LV_STATE_FOCUSED);        // 取消已获得的焦点
+lv_obj_clear_flag(ui_TextArea30, LV_OBJ_FLAG_CLICK_FOCUSABLE); // 禁止通过点击获取焦点
+
+// 隐藏“光标”这个部件（LV_PART_CURSOR）
+lv_obj_set_style_bg_opa(ui_TextArea30, LV_OPA_TRANSP, LV_PART_CURSOR);
+lv_obj_set_style_border_width(ui_TextArea30, 0, LV_PART_CURSOR);
+lv_obj_set_style_opa(ui_TextArea30, LV_OPA_TRANSP, LV_PART_CURSOR); // 保险
+
     lv_obj_set_width(ui_TextArea30, 304);
     lv_obj_set_height(ui_TextArea30, 99);
     lv_obj_set_x(ui_TextArea30, 0);
@@ -98,6 +95,9 @@ void create_global_panel() {
     lv_obj_set_style_bg_opa(ui_TextArea39, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(ui_TextArea39, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 		lv_obj_add_event_cb(ui_TextArea39, ui_event_TextArea39, LV_EVENT_ALL, NULL);
+		lv_obj_set_style_opa(ui_TextArea39, 0, LV_PART_CURSOR | LV_STATE_DEFAULT);
+		
+		lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);  // 让 panel 可见
 }
 //lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);  // 让 panel 可见
 //lv_obj_add_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
