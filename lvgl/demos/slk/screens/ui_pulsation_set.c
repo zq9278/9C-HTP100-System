@@ -48,6 +48,7 @@ void ui_event_b_add2(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     if (code != LV_EVENT_RELEASED) return;
+    BEE1(e);
     if (value2 < 550) value2 += 100;
     lv_label_set_text_fmt(ui_Label28, "%d", value2);
     lv_meter_set_indicator_end_value(meter2, scale_lines_indicator2, value2);
@@ -59,6 +60,7 @@ void ui_event_b_sub2(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     if (code != LV_EVENT_RELEASED) return;
+    BEE1(e);
     if (value2 > 150) value2 -= 100;
     lv_label_set_text_fmt(ui_Label28, "%d", value2);
     lv_meter_set_indicator_end_value(meter2, scale_lines_indicator2, value2);

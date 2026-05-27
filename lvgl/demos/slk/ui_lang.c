@@ -5,6 +5,7 @@
 
 typedef struct {
     lv_obj_t **ref;
+    lv_obj_t *obj;
     int16_t x;
     int16_t y;
     lv_coord_t w;
@@ -12,12 +13,49 @@ typedef struct {
     const lv_font_t *font;
     int16_t letter_space;
     int16_t line_space;
+    lv_text_align_t text_align;
+    uint8_t is_textarea;
+    uint8_t one_line;
     uint8_t used;
 } obj_snapshot_t;
 
-static obj_snapshot_t snapshots[96];
+static obj_snapshot_t snapshots[128];
 
-static void snapshot_obj(lv_obj_t **ref)
+static obj_snapshot_t *find_snapshot(lv_obj_t **ref)
+{
+    uint32_t i;
+
+    if(ref == NULL) return NULL;
+
+    for(i = 0; i < sizeof(snapshots) / sizeof(snapshots[0]); ++i) {
+        if(snapshots[i].used && snapshots[i].ref == ref) {
+            return &snapshots[i];
+        }
+    }
+
+    return NULL;
+}
+
+static void capture_snapshot(obj_snapshot_t *snapshot, lv_obj_t **ref, uint8_t is_textarea)
+{
+    lv_obj_t *obj = *ref;
+
+    snapshot->used = 1;
+    snapshot->ref = ref;
+    snapshot->obj = obj;
+    snapshot->x = lv_obj_get_x_aligned(obj);
+    snapshot->y = lv_obj_get_y_aligned(obj);
+    snapshot->w = lv_obj_get_width(obj);
+    snapshot->h = lv_obj_get_height(obj);
+    snapshot->font = lv_obj_get_style_text_font(obj, LV_PART_MAIN | LV_STATE_DEFAULT);
+    snapshot->letter_space = lv_obj_get_style_text_letter_space(obj, LV_PART_MAIN | LV_STATE_DEFAULT);
+    snapshot->line_space = lv_obj_get_style_text_line_space(obj, LV_PART_MAIN | LV_STATE_DEFAULT);
+    snapshot->text_align = lv_obj_get_style_text_align(obj, LV_PART_MAIN | LV_STATE_DEFAULT);
+    snapshot->is_textarea = is_textarea;
+    snapshot->one_line = is_textarea ? (uint8_t)lv_textarea_get_one_line(obj) : 0;
+}
+
+static void snapshot_obj(lv_obj_t **ref, uint8_t is_textarea)
 {
     uint32_t i;
     lv_obj_t *obj;
@@ -26,22 +64,40 @@ static void snapshot_obj(lv_obj_t **ref)
     obj = *ref;
 
     for(i = 0; i < sizeof(snapshots) / sizeof(snapshots[0]); ++i) {
-        if(snapshots[i].used && snapshots[i].ref == ref) return;
+        if(snapshots[i].used && snapshots[i].ref == ref) {
+            if(snapshots[i].obj != obj) {
+                capture_snapshot(&snapshots[i], ref, is_textarea);
+            }
+            return;
+        }
     }
 
     for(i = 0; i < sizeof(snapshots) / sizeof(snapshots[0]); ++i) {
         if(!snapshots[i].used) {
-            snapshots[i].used = 1;
-            snapshots[i].ref = ref;
-            snapshots[i].x = lv_obj_get_x(obj);
-            snapshots[i].y = lv_obj_get_y(obj);
-            snapshots[i].w = lv_obj_get_width(obj);
-            snapshots[i].h = lv_obj_get_height(obj);
-            snapshots[i].font = lv_obj_get_style_text_font(obj, LV_PART_MAIN | LV_STATE_DEFAULT);
-            snapshots[i].letter_space = lv_obj_get_style_text_letter_space(obj, LV_PART_MAIN | LV_STATE_DEFAULT);
-            snapshots[i].line_space = lv_obj_get_style_text_line_space(obj, LV_PART_MAIN | LV_STATE_DEFAULT);
+            capture_snapshot(&snapshots[i], ref, is_textarea);
             return;
         }
+    }
+}
+
+static void apply_snapshot_layout(const obj_snapshot_t *snapshot, lv_obj_t *obj)
+{
+    if(snapshot == NULL || obj == NULL) return;
+
+    lv_obj_set_x(obj, snapshot->x);
+    lv_obj_set_y(obj, snapshot->y);
+    lv_obj_set_width(obj, snapshot->w);
+    lv_obj_set_height(obj, snapshot->h);
+    if(snapshot->font != NULL) {
+        lv_obj_set_style_text_font(obj, snapshot->font, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    lv_obj_set_style_text_letter_space(obj, snapshot->letter_space, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_line_space(obj, snapshot->line_space, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_align(obj, snapshot->text_align, LV_PART_MAIN | LV_STATE_DEFAULT);
+    if(snapshot->is_textarea) {
+        lv_textarea_set_one_line(obj, snapshot->one_line != 0);
+        lv_obj_set_width(obj, snapshot->w);
+        lv_obj_set_height(obj, snapshot->h);
     }
 }
 
@@ -54,26 +110,32 @@ static void restore_snapshots(void)
 
         if(!snapshots[i].used || snapshots[i].ref == NULL || *snapshots[i].ref == NULL) continue;
         obj = *snapshots[i].ref;
-        lv_obj_set_x(obj, snapshots[i].x);
-        lv_obj_set_y(obj, snapshots[i].y);
-        lv_obj_set_width(obj, snapshots[i].w);
-        lv_obj_set_height(obj, snapshots[i].h);
-        if(snapshots[i].font != NULL) {
-            lv_obj_set_style_text_font(obj, snapshots[i].font, LV_PART_MAIN | LV_STATE_DEFAULT);
-        }
-        lv_obj_set_style_text_letter_space(obj, snapshots[i].letter_space, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_line_space(obj, snapshots[i].line_space, LV_PART_MAIN | LV_STATE_DEFAULT);
+        apply_snapshot_layout(&snapshots[i], obj);
     }
 }
 
-static void set_textarea(lv_obj_t **ref, const char *text, lv_coord_t x, lv_coord_t y, lv_coord_t w,
-                         lv_coord_t h, const lv_font_t *font)
+static void set_bounds(lv_obj_t **ref, lv_coord_t x, lv_coord_t y, lv_coord_t w, lv_coord_t h)
 {
     lv_obj_t *obj;
 
     if(ref == NULL || *ref == NULL) return;
-    snapshot_obj(ref);
+    snapshot_obj(ref, 0);
     obj = *ref;
+    if(w >= 0) lv_obj_set_width(obj, w);
+    if(h >= 0) lv_obj_set_height(obj, h);
+    if(x != INT16_MIN) lv_obj_set_x(obj, x);
+    if(y != INT16_MIN) lv_obj_set_y(obj, y);
+}
+
+static void set_textarea_ex(lv_obj_t **ref, const char *text, lv_coord_t x, lv_coord_t y, lv_coord_t w,
+                            lv_coord_t h, const lv_font_t *font, uint8_t one_line)
+{
+    lv_obj_t *obj;
+
+    if(ref == NULL || *ref == NULL) return;
+    snapshot_obj(ref, 1);
+    obj = *ref;
+    lv_textarea_set_one_line(obj, one_line != 0);
     lv_textarea_set_text(obj, text);
     lv_textarea_set_cursor_pos(obj, 0);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
@@ -86,6 +148,14 @@ static void set_textarea(lv_obj_t **ref, const char *text, lv_coord_t x, lv_coor
     if(y != INT16_MIN) lv_obj_set_y(obj, y);
     if(font != NULL) lv_obj_set_style_text_font(obj, font, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_letter_space(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_line_space(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+}
+
+static void set_textarea(lv_obj_t **ref, const char *text, lv_coord_t x, lv_coord_t y, lv_coord_t w,
+                         lv_coord_t h, const lv_font_t *font)
+{
+    set_textarea_ex(ref, text, x, y, w, h, font, 0);
 }
 
 static void set_label(lv_obj_t **ref, const char *text, lv_coord_t x, lv_coord_t y, lv_coord_t w,
@@ -94,7 +164,7 @@ static void set_label(lv_obj_t **ref, const char *text, lv_coord_t x, lv_coord_t
     lv_obj_t *obj;
 
     if(ref == NULL || *ref == NULL) return;
-    snapshot_obj(ref);
+    snapshot_obj(ref, 0);
     obj = *ref;
     lv_label_set_text(obj, text);
     if(w >= 0) lv_obj_set_width(obj, w);
@@ -102,28 +172,52 @@ static void set_label(lv_obj_t **ref, const char *text, lv_coord_t x, lv_coord_t
     if(y != INT16_MIN) lv_obj_set_y(obj, y);
     if(font != NULL) lv_obj_set_style_text_font(obj, font, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_letter_space(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_line_space(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
 static void restore_textarea(lv_obj_t **ref, const char *text)
 {
     if(ref != NULL && *ref != NULL) {
+        obj_snapshot_t *snapshot = find_snapshot(ref);
+
+        lv_textarea_set_one_line(*ref, snapshot != NULL ? (snapshot->one_line != 0) : false);
         lv_textarea_set_text(*ref, text);
         lv_textarea_set_cursor_pos(*ref, 0);
         lv_obj_clear_flag(*ref, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_scroll_to_x(*ref, 0, LV_ANIM_OFF);
         lv_obj_scroll_to_y(*ref, 0, LV_ANIM_OFF);
         lv_textarea_set_cursor_click_pos(*ref, false);
+        if(snapshot != NULL) {
+            apply_snapshot_layout(snapshot, *ref);
+        }
     }
 }
 
 static void restore_label(lv_obj_t **ref, const char *text)
 {
-    if(ref != NULL && *ref != NULL) lv_label_set_text(*ref, text);
+    if(ref != NULL && *ref != NULL) {
+        obj_snapshot_t *snapshot = find_snapshot(ref);
+
+        lv_label_set_text(*ref, text);
+        if(snapshot != NULL) {
+            apply_snapshot_layout(snapshot, *ref);
+        }
+    }
 }
 
 static void apply_common_state(void)
 {
-    ui_lang_apply_bee_setting_state();
+    ui_lang_apply_setting_state();
+}
+
+static void finalize_layout(void)
+{
+    lv_obj_t *scr = lv_scr_act();
+
+    if(scr == NULL) return;
+    lv_obj_update_layout(scr);
+    lv_obj_invalidate(scr);
 }
 
 static void apply_zh_texts(void)
@@ -227,43 +321,43 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea34, "Heating", INT16_MIN, INT16_MIN, 150, 34, mid);
     set_textarea(&ui_TextArea45, "Stop", INT16_MIN, INT16_MIN, 125, 52, font30);
     set_textarea(&ui_TextArea51, "Countdown", INT16_MIN, INT16_MIN, 153, 32, mid);
-    if(ui_TextArea51 != NULL) lv_obj_set_style_text_letter_space(ui_TextArea51, -2, LV_PART_MAIN | LV_STATE_DEFAULT);
     set_textarea(&ui_TextArea44, "Start", INT16_MIN, INT16_MIN, 145, 58, font40);
-    set_textarea(&ui_TextArea56, "Back to\nHome", INT16_MIN, INT16_MIN, 170, 56, small);
-    set_textarea(&ui_TextArea18, "Heating\nstopped", INT16_MIN, INT16_MIN, 240, 82, font30);
-    set_textarea(&ui_TextArea57, "Back to\nHome", INT16_MIN, INT16_MIN, 170, 56, small);
-    set_textarea(&ui_TextArea19, "Heating\ncompleted", INT16_MIN, INT16_MIN, 250, 82, font30);
+    set_bounds(&ui_Container25, INT16_MIN, INT16_MIN, 250, 74);
+    set_textarea_ex(&ui_TextArea56, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea18, "Manual treatment stopped", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
+    set_bounds(&ui_Container29, INT16_MIN, INT16_MIN, 250, 74);
+    set_textarea_ex(&ui_TextArea57, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea19, "Manual treatment completed", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
 
     set_textarea(&ui_TextArea35, "Compressing", INT16_MIN, INT16_MIN, 210, 34, mid);
     set_textarea(&ui_TextArea52, "Countdown", INT16_MIN, INT16_MIN, 153, 32, mid);
-    if(ui_TextArea52 != NULL) lv_obj_set_style_text_letter_space(ui_TextArea52, -2, LV_PART_MAIN | LV_STATE_DEFAULT);
     set_textarea(&ui_TextArea48, "Stop", INT16_MIN, INT16_MIN, 125, 52, font30);
     set_textarea(&ui_TextArea47, "Start", INT16_MIN, INT16_MIN, 145, 58, font40);
-    set_textarea(&ui_TextArea58, "Back to\nHome", INT16_MIN, INT16_MIN, 170, 56, small);
-    set_textarea(&ui_TextArea20, "Compression\nstopped", INT16_MIN, INT16_MIN, 260, 82, font30);
-    set_textarea(&ui_TextArea21, "Compression\ncompleted", INT16_MIN, INT16_MIN, 280, 82, font30);
-    set_textarea(&ui_TextArea62, "Back to\nHome", INT16_MIN, INT16_MIN, 170, 56, small);
+    set_bounds(&ui_Container28, INT16_MIN, INT16_MIN, 250, 74);
+    set_textarea_ex(&ui_TextArea58, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea20, "Compression stopped", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
+    set_textarea_ex(&ui_TextArea21, "Compression completed", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
+    set_bounds(&ui_Container34, INT16_MIN, INT16_MIN, 250, 74);
+    set_textarea_ex(&ui_TextArea62, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
 
     set_textarea(&ui_TextArea36, "Quick\nTreatment", INT16_MIN, INT16_MIN, 150, 46, small);
     set_textarea(&ui_TextArea53, "Countdown", INT16_MIN, INT16_MIN, 153, 32, mid);
-    if(ui_TextArea53 != NULL) lv_obj_set_style_text_letter_space(ui_TextArea53, -2, LV_PART_MAIN | LV_STATE_DEFAULT);
     set_textarea(&ui_TextArea49, "Stop", INT16_MIN, INT16_MIN, 125, 52, font30);
     set_textarea(&ui_TextArea50, "Start", INT16_MIN, INT16_MIN, 145, 58, font40);
     set_label(&ui_Label40, "Pressure:", INT16_MIN, INT16_MIN, 130, mid);
     set_label(&ui_Label34, "Temperature:", INT16_MIN, INT16_MIN, 155, mid);
-    set_textarea(&ui_TextArea60, "Back to\nHome", INT16_MIN, INT16_MIN, 170, 56, small);
-    set_textarea(&ui_TextArea23, "Quick treatment\nstopped", INT16_MIN, INT16_MIN, 290, 82, font30);
-    set_textarea(&ui_TextArea61, "Back to\nHome", INT16_MIN, INT16_MIN, 170, 56, small);
-    set_textarea(&ui_TextArea22, "Quick treatment\ncompleted", INT16_MIN, INT16_MIN, 290, 82, font30);
+    set_bounds(&ui_Container30, INT16_MIN, INT16_MIN, 250, 74);
+    set_textarea_ex(&ui_TextArea60, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea23, "Auto treatment stopped", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
+    set_bounds(&ui_Container32, INT16_MIN, INT16_MIN, 250, 74);
+    set_textarea_ex(&ui_TextArea61, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea22, "Auto treatment completed", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
 
     set_textarea(&ui_TextArea16, "Shield Usage Count", INT16_MIN, INT16_MIN, 320, 58, font30);
     set_textarea(&ui_TextArea17, "Treatment Count", INT16_MIN, INT16_MIN, 300, 58, font30);
     set_textarea(&ui_TextArea25, "Heat Treatment Count:", 0, INT16_MIN, 360, 38, mid);
     set_textarea(&ui_TextArea26, "Compression Treatment Count:", 0, INT16_MIN, 360, 38, mid);
     set_textarea(&ui_TextArea27, "Quick Treatment Count:", 0, INT16_MIN, 360, 38, mid);
-    if(ui_TextArea25 != NULL) lv_obj_set_style_text_letter_space(ui_TextArea25, -1, LV_PART_MAIN | LV_STATE_DEFAULT);
-    if(ui_TextArea26 != NULL) lv_obj_set_style_text_letter_space(ui_TextArea26, -1, LV_PART_MAIN | LV_STATE_DEFAULT);
-    if(ui_TextArea27 != NULL) lv_obj_set_style_text_letter_space(ui_TextArea27, -1, LV_PART_MAIN | LV_STATE_DEFAULT);
     set_textarea(&ui_TextArea28, "Shield Usage Count", INT16_MIN, INT16_MIN, 360, 58, font30);
     set_textarea(&ui_TextArea24, "Back to Home", INT16_MIN, INT16_MIN, 280, 50, font30);
 
@@ -300,7 +394,7 @@ uint16_t ui_lang_get(void)
     return language == UI_LANG_EN ? UI_LANG_EN : UI_LANG_ZH;
 }
 
-void ui_lang_apply_bee_setting_state(void)
+void ui_lang_apply_bee_state(void)
 {
     if(ui_Image95 != NULL && ui_Image109 != NULL && ui_Image113 != NULL && ui_Image110 != NULL) {
         if(bee) {
@@ -315,7 +409,10 @@ void ui_lang_apply_bee_setting_state(void)
             lv_obj_add_flag(ui_Image110, LV_OBJ_FLAG_HIDDEN);
         }
     }
+}
 
+void ui_lang_apply_language_state(void)
+{
     if(ui_Image93 != NULL && ui_Image83 != NULL && ui_Image94 != NULL && ui_Image84 != NULL) {
         if(ui_lang_get() == UI_LANG_EN) {
             lv_obj_add_flag(ui_Image93, LV_OBJ_FLAG_HIDDEN);
@@ -331,6 +428,12 @@ void ui_lang_apply_bee_setting_state(void)
     }
 }
 
+void ui_lang_apply_setting_state(void)
+{
+    ui_lang_apply_bee_state();
+    ui_lang_apply_language_state();
+}
+
 void ui_lang_apply_all(void)
 {
     if(ui_lang_get() == UI_LANG_EN) {
@@ -340,6 +443,7 @@ void ui_lang_apply_all(void)
         apply_zh_texts();
     }
     apply_common_state();
+    finalize_layout();
 }
 
 void ui_lang_set(uint16_t lang)

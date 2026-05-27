@@ -316,7 +316,7 @@ void ui_bee_setting_screen_init(void)
     lv_obj_add_event_cb(ui_Image110, ui_event_Image110, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_Image83, ui_event_Image83, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_Image84, ui_event_Image84, LV_EVENT_ALL, NULL);
-    ui_lang_apply_bee_setting_state();
+    ui_lang_apply_setting_state();
 
 }
 

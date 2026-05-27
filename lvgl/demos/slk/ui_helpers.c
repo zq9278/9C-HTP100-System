@@ -4,6 +4,7 @@
 // Project name: 9C-U-HTP100-UI-ZN
 
 #include "ui_helpers.h"
+#include "ui_lang.h"
 
 void _ui_bar_set_property(lv_obj_t * target, int id, int val)
 {
@@ -53,6 +54,9 @@ void _ui_screen_change(lv_obj_t ** target, lv_scr_load_anim_t fademode, int spd,
 {
     if(*target == NULL)
         target_init();
+    ui_lang_apply_all();
+    lv_obj_update_layout(*target);
+    lv_obj_invalidate(*target);
     lv_scr_load_anim(*target, fademode, spd, delay, false);
 }
 

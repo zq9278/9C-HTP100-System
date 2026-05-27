@@ -509,9 +509,7 @@ void prepare_set_pre3(lv_event_t *e) {
 void bee_set_on(lv_event_t *e) {
   bee = 1;
   HAL_GPIO_WritePin(Bee_vcc_GPIO_Port, Bee_vcc_Pin, GPIO_PIN_SET);
-  lv_obj_add_flag(ui_Image113,
-                  LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// Flags
-  lv_obj_clear_flag(ui_Image95, LV_OBJ_FLAG_HIDDEN);
+  ui_lang_apply_bee_state();
   volatile static AXI_SRAM prepare_data pData;
   pData.cmd_head_high = 0x6A;
   pData.cmd_head_low = 0xA6;
@@ -528,9 +526,7 @@ void bee_set_on(lv_event_t *e) {
 void bee_set_off(lv_event_t *e) {
   bee = 0;
   HAL_GPIO_WritePin(Bee_vcc_GPIO_Port, Bee_vcc_Pin, GPIO_PIN_RESET);
-  lv_obj_add_flag(ui_Image95,
-                  LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// Flags
-  lv_obj_clear_flag(ui_Image113, LV_OBJ_FLAG_HIDDEN);
+  ui_lang_apply_bee_state();
   volatile static AXI_SRAM prepare_data pData;
   pData.cmd_head_high = 0x6A;
   pData.cmd_head_low = 0xA6;
