@@ -206,9 +206,55 @@ static void restore_label(lv_obj_t **ref, const char *text)
     }
 }
 
+static void suppress_textarea_cursor(lv_obj_t *obj)
+{
+    if(obj == NULL) return;
+
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICK_FOCUSABLE);
+    lv_textarea_set_cursor_click_pos(obj, false);
+    lv_obj_clear_state(obj, LV_STATE_FOCUSED);
+    lv_obj_clear_state(obj, LV_STATE_FOCUS_KEY);
+    lv_obj_clear_state(obj, LV_STATE_EDITED);
+}
+
+static void apply_setting_interaction_state(void)
+{
+    suppress_textarea_cursor(ui_TextArea1);
+    suppress_textarea_cursor(ui_TextArea3);
+}
+
+static void apply_return_home_interaction_state(void)
+{
+    suppress_textarea_cursor(ui_TextArea24);
+    suppress_textarea_cursor(ui_TextArea39);
+    suppress_textarea_cursor(ui_TextArea56);
+    suppress_textarea_cursor(ui_TextArea57);
+    suppress_textarea_cursor(ui_TextArea58);
+    suppress_textarea_cursor(ui_TextArea60);
+    suppress_textarea_cursor(ui_TextArea61);
+    suppress_textarea_cursor(ui_TextArea62);
+}
+
+void ui_lang_apply_invalid_shield_popup_state(void)
+{
+    const lv_font_t *font30 = &ui_font_alibaba30;
+
+    if(ui_lang_get() == UI_LANG_EN) {
+        set_textarea(&ui_TextArea30, "Shield invalid\nReplace shield", INT16_MIN, -8, 270, 76, font30);
+        set_textarea_ex(&ui_TextArea39, "Back to Home", INT16_MIN, 2, 250, 44, font30, 1);
+    } else {
+        restore_textarea(&ui_TextArea30, "检测眼盾无效\n请更换眼盾");
+        restore_textarea(&ui_TextArea39, "返回首页");
+    }
+
+    suppress_textarea_cursor(ui_TextArea39);
+}
+
 static void apply_common_state(void)
 {
     ui_lang_apply_setting_state();
+    apply_setting_interaction_state();
+    apply_return_home_interaction_state();
 }
 
 static void finalize_layout(void)
@@ -226,8 +272,7 @@ static void apply_zh_texts(void)
     restore_textarea(&ui_TextArea32, "挤压");
     restore_textarea(&ui_TextArea31, "加热");
     restore_textarea(&ui_TextArea29, "设定一");
-    restore_textarea(&ui_TextArea30, "检测眼盾无效\n请更换眼盾");
-    restore_textarea(&ui_TextArea39, "返回首页");
+    ui_lang_apply_invalid_shield_popup_state();
 
     restore_textarea(&ui_TextArea43, "准  备");
     restore_textarea(&ui_TextArea46, "准  备");
@@ -275,7 +320,7 @@ static void apply_zh_texts(void)
     restore_textarea(&ui_TextArea3, " 系统设置");
     restore_textarea(&ui_TextArea37, "发布版本号: V1");
     restore_textarea(&ui_TextArea38, "完整版本号: V1.0.2.");
-    restore_textarea(&ui_TextArea42, "20241226");
+    set_textarea_ex(&ui_TextArea42, "20241226", 91, 279, 124, 26, &ui_font_alibaba10, 1);
     restore_textarea(&ui_TextArea13, "设定一");
     restore_textarea(&ui_TextArea15, "设定二");
     restore_textarea(&ui_TextArea14, "设定三");
@@ -310,8 +355,7 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea32, "Compress", INT16_MIN, INT16_MIN, 180, 45, font30);
     set_textarea(&ui_TextArea31, "Heat", INT16_MIN, INT16_MIN, 86, 45, font30);
     set_textarea(&ui_TextArea29, "Setting 1", INT16_MIN, INT16_MIN, 105, 30, small);
-    set_textarea(&ui_TextArea30, "Invalid shield\nPlease replace it", INT16_MIN, INT16_MIN, 230, 76, font30);
-    set_textarea(&ui_TextArea39, "Return to Home", INT16_MIN, INT16_MIN, 148, 42, font30);
+    ui_lang_apply_invalid_shield_popup_state();
 
     set_textarea(&ui_TextArea43, "Prepare", INT16_MIN, INT16_MIN, 170, 56, font30);
     set_textarea(&ui_TextArea46, "Prepare", INT16_MIN, INT16_MIN, 170, 56, font30);
@@ -365,7 +409,7 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea3, "System Setting", INT16_MIN, INT16_MIN, 250, 54, font30);
     set_textarea(&ui_TextArea37, "Version: V1", INT16_MIN, INT16_MIN, 170, 26, small);
     set_textarea(&ui_TextArea38, "Software Ver: V1.0.2.", -18, INT16_MIN, 200, 26, small);
-    set_textarea(&ui_TextArea42, "20241226", 84, INT16_MIN, 82, 26, small);
+    set_textarea_ex(&ui_TextArea42, "20241226", 90, 281, 140, 26, small, 1);
     set_textarea(&ui_TextArea13, "Preset 1", INT16_MIN, INT16_MIN, 220, 58, font40);
     set_textarea(&ui_TextArea15, "Preset 2", INT16_MIN, INT16_MIN, 220, 58, font40);
     set_textarea(&ui_TextArea14, "Preset 3", INT16_MIN, INT16_MIN, 220, 58, font40);

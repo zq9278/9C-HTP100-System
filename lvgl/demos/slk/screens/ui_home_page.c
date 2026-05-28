@@ -118,7 +118,7 @@ void ui_home_page_screen_init(void)
     ui_battery = lv_obj_create(ui_home_page);
     lv_obj_remove_style_all(ui_battery);
     lv_obj_set_width(ui_battery, 150);
-    lv_obj_set_height(ui_battery, 60);
+    lv_obj_set_height(ui_battery, 90);
     lv_obj_set_x(ui_battery, 0);
     lv_obj_set_y(ui_battery, 8);
     lv_obj_set_align(ui_battery, LV_ALIGN_TOP_RIGHT);
@@ -129,7 +129,7 @@ void ui_home_page_screen_init(void)
     lv_obj_set_width(ui_Image47, LV_SIZE_CONTENT);   /// 58
     lv_obj_set_height(ui_Image47, LV_SIZE_CONTENT);    /// 28
     lv_obj_set_x(ui_Image47, 33);
-    lv_obj_set_y(ui_Image47, -2);
+    lv_obj_set_y(ui_Image47, -23);
     lv_obj_set_align(ui_Image47, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_Image47, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
     lv_obj_clear_flag(ui_Image47, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
@@ -140,7 +140,7 @@ void ui_home_page_screen_init(void)
     lv_obj_set_width(ui_Slider1, 47);
     lv_obj_set_height(ui_Slider1, 22);
     lv_obj_set_x(ui_Slider1, 31);
-    lv_obj_set_y(ui_Slider1, -2);
+    lv_obj_set_y(ui_Slider1, -23);
     lv_obj_set_align(ui_Slider1, LV_ALIGN_CENTER);
     lv_obj_clear_flag(ui_Slider1, LV_OBJ_FLAG_CLICKABLE);      /// Flags
     lv_obj_set_style_radius(ui_Slider1, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -172,14 +172,14 @@ void ui_home_page_screen_init(void)
     lv_obj_set_width(ui_Image71, LV_SIZE_CONTENT);   /// 40
     lv_obj_set_height(ui_Image71, LV_SIZE_CONTENT);    /// 50
     lv_obj_set_x(ui_Image71, -31);
-    lv_obj_set_y(ui_Image71, -2);
+    lv_obj_set_y(ui_Image71, -23);
     lv_obj_set_align(ui_Image71, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_Image71, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
     lv_obj_clear_flag(ui_Image71, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
     ui_Button23 = lv_btn_create(ui_battery);
-    lv_obj_set_width(ui_Button23, 60);
-    lv_obj_set_height(ui_Button23, 60);
+    lv_obj_set_width(ui_Button23, 87);
+    lv_obj_set_height(ui_Button23, 96);
     lv_obj_set_x(ui_Button23, -31);
     lv_obj_set_y(ui_Button23, -5);
     lv_obj_set_align(ui_Button23, LV_ALIGN_CENTER);

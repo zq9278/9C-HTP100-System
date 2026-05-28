@@ -79,6 +79,7 @@ void processData_prepare(prepare_data_p msg);
 void work_flinsh(void);
 void  screenstart(void);
 void  screenack(void);
+void screen_refresh_prepare_ui(void);
 void screen_refresh_runtime_ui(void);
 HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart, uint8_t *data, uint16_t size);
 

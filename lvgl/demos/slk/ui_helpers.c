@@ -7,6 +7,14 @@
 #include "ui_lang.h"
 #include "screen.h"
 
+__attribute__((weak)) void screen_refresh_runtime_ui(void)
+{
+}
+
+__attribute__((weak)) void screen_refresh_prepare_ui(void)
+{
+}
+
 void _ui_bar_set_property(lv_obj_t * target, int id, int val)
 {
     if(id == _UI_BAR_PROPERTY_VALUE_WITH_ANIM) lv_bar_set_value(target, val, LV_ANIM_ON);

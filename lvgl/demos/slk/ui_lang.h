@@ -16,6 +16,7 @@ void ui_lang_apply_all(void);
 void ui_lang_apply_bee_state(void);
 void ui_lang_apply_language_state(void);
 void ui_lang_apply_setting_state(void);
+void ui_lang_apply_invalid_shield_popup_state(void);
 
 void ui_debug_init_screen(const char *screen_name);
 void ui_debug_load_screen(const char *screen_name);

@@ -201,12 +201,14 @@ void ui_setting_screen_init(void)
 
     ui_TextArea42 = lv_textarea_create(ui_setting);
     lv_obj_set_width(ui_TextArea42, 124);
-    lv_obj_set_height(ui_TextArea42, LV_SIZE_CONTENT);    /// 70
+    lv_obj_set_height(ui_TextArea42, 26);
     lv_obj_set_x(ui_TextArea42, 91);
-    lv_obj_set_y(ui_TextArea42, 280);
+    lv_obj_set_y(ui_TextArea42, 278);
     lv_obj_set_align(ui_TextArea42, LV_ALIGN_CENTER);
+    lv_textarea_set_one_line(ui_TextArea42, true);
     lv_textarea_set_text(ui_TextArea42, "20241226");
     lv_textarea_set_placeholder_text(ui_TextArea42, "Placeholder...");
+    lv_obj_clear_flag(ui_TextArea42, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);      /// Flags
     lv_obj_set_style_text_color(ui_TextArea42, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_TextArea42, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui_TextArea42, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -214,6 +216,8 @@ void ui_setting_screen_init(void)
     lv_obj_set_style_bg_color(ui_TextArea42, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_TextArea42, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(ui_TextArea42, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_top(ui_TextArea42, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_bottom(ui_TextArea42, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_add_event_cb(ui_Button6, ui_event_Button6, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_Factory_mode, ui_event_Factory_mode, LV_EVENT_ALL, NULL);

@@ -3,6 +3,7 @@
 #include "ui-myself.h"
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 uint8_t EYE_status;
 extern uint8_t work_mode;
 extern TIM_HandleTypeDef htim14;
@@ -53,6 +54,34 @@ static uint8_t battery_percent = 0;
 static uint8_t battery_percent_valid = 0;
 static uint32_t software_version = 20241226UL;
 
+typedef struct {
+  lv_coord_t width;
+  lv_coord_t height;
+  lv_coord_t y;
+  lv_coord_t pad_top;
+  lv_coord_t pad_bottom;
+} version_text_layout_t;
+
+static version_text_layout_t version_text_layout(void) {
+  version_text_layout_t layout;
+
+  if (ui_lang_get() == UI_LANG_EN) {
+    layout.width = 124;
+    layout.height = 28;
+    layout.y = 289;
+    layout.pad_top = 1;
+    layout.pad_bottom = 0;
+  } else {
+    layout.width = 124;
+    layout.height = 27;
+    layout.y = 282;
+    layout.pad_top = 0;
+    layout.pad_bottom = 0;
+  }
+
+  return layout;
+}
+
 static int16_t temp_to_tenths(float_t value) {
   float_t scaled = value * 10.0f;
   return (int16_t)(scaled >= 0.0f ? scaled + 0.5f : scaled - 0.5f);
@@ -89,6 +118,8 @@ static void set_pressure_label(lv_obj_t *label, uint16_t value) {
 
 static void set_version_text(void) {
   char version_text[16];
+  const char *current_text;
+  version_text_layout_t layout;
 
   if (ui_TextArea42 == NULL) {
     return;
@@ -96,10 +127,59 @@ static void set_version_text(void) {
 
   snprintf(version_text, sizeof(version_text), "%lu",
            (unsigned long)software_version);
+  current_text = lv_textarea_get_text(ui_TextArea42);
+  layout = version_text_layout();
+
+  lv_textarea_set_one_line(ui_TextArea42, true);
+  lv_textarea_set_cursor_click_pos(ui_TextArea42, false);
+  lv_obj_clear_flag(ui_TextArea42, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_width(ui_TextArea42, layout.width);
+  lv_obj_set_height(ui_TextArea42, layout.height);
+  lv_obj_set_y(ui_TextArea42, layout.y);
+  lv_obj_set_style_pad_top(ui_TextArea42, layout.pad_top,
+                           LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_pad_bottom(ui_TextArea42, layout.pad_bottom,
+                              LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_line_space(ui_TextArea42, 0,
+                                   LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_text_letter_space(ui_TextArea42, 0,
+                                     LV_PART_MAIN | LV_STATE_DEFAULT);
+  if (current_text != NULL && strcmp(current_text, version_text) == 0) {
+    return;
+  }
   lv_textarea_set_text(ui_TextArea42, version_text);
+  lv_textarea_set_cursor_pos(ui_TextArea42, 0);
+  lv_obj_scroll_to_x(ui_TextArea42, 0, LV_ANIM_OFF);
+  lv_obj_scroll_to_y(ui_TextArea42, 0, LV_ANIM_OFF);
+}
+
+void screen_refresh_prepare_ui(void) {
+  if (ui_TextArea29 == NULL) {
+    return;
+  }
+
+  switch (prepare_set) {
+  case 1:
+    lv_textarea_set_text(ui_TextArea29,
+                         ui_lang_get() == UI_LANG_EN ? "Setting 1" : "设定一");
+    break;
+  case 2:
+    lv_textarea_set_text(ui_TextArea29,
+                         ui_lang_get() == UI_LANG_EN ? "Setting 2" : "设定二");
+    break;
+  case 3:
+    lv_textarea_set_text(ui_TextArea29,
+                         ui_lang_get() == UI_LANG_EN ? "Setting 3" : "设定三");
+    break;
+  default:
+    lv_textarea_set_text(ui_TextArea29,
+                         ui_lang_get() == UI_LANG_EN ? "Setting 1" : "设定一");
+    break;
+  }
 }
 
 void screen_refresh_runtime_ui(void) {
+  screen_refresh_prepare_ui();
   set_temperature_label(ui_Label30, hot_temperature_tenths);
   set_temperature_label(ui_Label39, auto_temperature_tenths);
   set_pressure_label(ui_Label32, pulsation_pressure);
@@ -366,84 +446,43 @@ void processData_prepare(prepare_data_p msg) {
   case 0x00A2:                                           // �??�?�??�数
     lv_label_set_text_fmt(ui_Label4, "%05d", (int)data); //
     break;
-  case 0x00A3: // 选择预�?��?
+    case 0x00A3: // 选择预设
     prepare_set = data;
     switch (prepare_set) {
-    case 0:
-      // 				    lv_obj_set_style_img_recolor_opa(ui_Image97,
-      // 170, LV_PART_MAIN | LV_STATE_DEFAULT);
-      // lv_obj_set_style_img_recolor_opa(ui_Image100, 170, LV_PART_MAIN |
-      // LV_STATE_DEFAULT); lv_obj_set_style_img_recolor_opa(ui_Image99, 170,
-      // LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_bg_opa(
-          ui_Panel16, 220,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
-      lv_obj_set_style_bg_opa(
-          ui_Panel17, 220,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
-      lv_obj_set_style_bg_opa(
-          ui_Panel18, 220,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
-      lv_obj_add_flag(ui_Image24,
-                      LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// Flags
+    case 0: {
+      // 保持原有的面板透明度设置
+      lv_obj_set_style_bg_opa(ui_Panel16, 220, LV_PART_MAIN); // 设置背景透明度
+      lv_obj_set_style_bg_opa(ui_Panel17, 220, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(ui_Panel18, 220, LV_PART_MAIN);
+
+      lv_obj_add_flag(ui_Image24, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// Flags
       prepare_time = 1;
       prepare_crimp = 150;
+    } break;
+    case 1: {
+      lv_obj_set_style_bg_opa(ui_Panel16, 0, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(ui_Panel17, 220, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(ui_Panel18, 220, LV_PART_MAIN);
 
-      break;
-    case 1:
-      // 				     lv_obj_set_style_img_recolor_opa(ui_Image97,
-      // 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-      // lv_obj_set_style_img_recolor_opa(ui_Image100, 170, LV_PART_MAIN |
-      // LV_STATE_DEFAULT); lv_obj_set_style_img_recolor_opa(ui_Image99, 170,
-      // LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_bg_opa(
-          ui_Panel16, 0,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
-      lv_obj_set_style_bg_opa(
-          ui_Panel17, 220,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
-      lv_obj_set_style_bg_opa(
-          ui_Panel18, 220,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
       lv_obj_clear_flag(ui_Image24, LV_OBJ_FLAG_HIDDEN); /// Flags
-      lv_textarea_set_text(ui_TextArea29, "设定一");
-      break;
-    case 2:
-      // 				lv_obj_set_style_img_recolor_opa(ui_Image97,
-      // 170, LV_PART_MAIN | LV_STATE_DEFAULT);
-      // lv_obj_set_style_img_recolor_opa(ui_Image100, 0, LV_PART_MAIN |
-      // LV_STATE_DEFAULT); lv_obj_set_style_img_recolor_opa(ui_Image99, 170,
-      // LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_bg_opa(
-          ui_Panel16, 220,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
-      lv_obj_set_style_bg_opa(
-          ui_Panel17, 0,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
-      lv_obj_set_style_bg_opa(
-          ui_Panel18, 220,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
+      screen_refresh_prepare_ui();
+    } break;
+    case 2: {
+      lv_obj_set_style_bg_opa(ui_Panel16, 220, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(ui_Panel17, 0, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(ui_Panel18, 220, LV_PART_MAIN);
+
       lv_obj_clear_flag(ui_Image24, LV_OBJ_FLAG_HIDDEN); /// Flags
-      lv_textarea_set_text(ui_TextArea29, "设定二");
-      break;
-    case 3:
-      // 				lv_obj_set_style_img_recolor_opa(ui_Image97,
-      // 170, LV_PART_MAIN | LV_STATE_DEFAULT);
-      // lv_obj_set_style_img_recolor_opa(ui_Image100, 170, LV_PART_MAIN |
-      // LV_STATE_DEFAULT); lv_obj_set_style_img_recolor_opa(ui_Image99, 0,
-      // LV_PART_MAIN | LV_STATE_DEFAULT);
-      lv_obj_set_style_bg_opa(
-          ui_Panel16, 220,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
-      lv_obj_set_style_bg_opa(
-          ui_Panel17, 220,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
-      lv_obj_set_style_bg_opa(
-          ui_Panel18, 0,
-          LV_PART_MAIN); // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
+      screen_refresh_prepare_ui();
+    } break;
+    case 3: {
+      lv_obj_set_style_bg_opa(ui_Panel16, 220, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(ui_Panel17, 220, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(ui_Panel18, 0, LV_PART_MAIN);
+
       lv_obj_clear_flag(ui_Image24, LV_OBJ_FLAG_HIDDEN); /// Flags
-      lv_textarea_set_text(ui_TextArea29, "设定三");
-      break;
+      screen_refresh_prepare_ui();
+    } break;
     }
     break;
   case 0x00A4: // 预�?�温�??
@@ -469,6 +508,16 @@ void processData_prepare(prepare_data_p msg) {
   case 0x00AA: // 预�?�时�??
     // prepare_time= data;
     lv_label_set_text_fmt(ui_Label8, "%02d", (int)data); // 显示加热温度次数
+    break;
+  case 0x00AC: // 型号区分
+    if (data == 0U) {
+      if (ui_Image24 != NULL) {
+        lv_obj_add_flag(ui_Image24, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST);
+      }
+      if (ui_Panel2 != NULL) {
+        lv_obj_add_flag(ui_Panel2, LV_OBJ_FLAG_HIDDEN);
+      }
+    }
     break;
 	case 0x00b0: // 
     lv_label_set_text_fmt(ui_Label1, "%d", (int)data); // 显示加热温度次数

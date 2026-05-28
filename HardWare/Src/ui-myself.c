@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "ui-myself.h"
+
 lv_obj_t * global_panel;
 lv_obj_t * global_panel = NULL;  // 确保只有一个 panel 实例
 
@@ -96,6 +97,8 @@ lv_obj_set_style_opa(ui_TextArea30, LV_OPA_TRANSP, LV_PART_CURSOR); // 保险
     lv_obj_set_style_border_width(ui_TextArea39, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 		lv_obj_add_event_cb(ui_TextArea39, ui_event_TextArea39, LV_EVENT_ALL, NULL);
 		lv_obj_set_style_opa(ui_TextArea39, 0, LV_PART_CURSOR | LV_STATE_DEFAULT);
+
+    ui_lang_apply_invalid_shield_popup_state();
 		
 		lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);  // 让 panel 可见
 }

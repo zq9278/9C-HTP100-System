@@ -375,7 +375,7 @@ void prepare_set1(lv_event_t *e) {
  lv_obj_set_style_bg_opa(ui_Panel18, 220, LV_PART_MAIN);            // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
     prepare_set = 1;
     lv_obj_clear_flag(ui_Image24, LV_OBJ_FLAG_HIDDEN); /// Flags
-    lv_textarea_set_text(ui_TextArea29, "设定一");
+    screen_refresh_prepare_ui();
   }
 
   volatile static AXI_SRAM prepare_data pData;
@@ -417,7 +417,7 @@ void prepare_set2(lv_event_t *e) {
  lv_obj_set_style_bg_opa(ui_Panel18, 220, LV_PART_MAIN);            // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
     prepare_set = 2;
     lv_obj_clear_flag(ui_Image24, LV_OBJ_FLAG_HIDDEN); /// Flags
-    lv_textarea_set_text(ui_TextArea29, "设定二");
+    screen_refresh_prepare_ui();
   }
 
   volatile static AXI_SRAM prepare_data pData;
@@ -460,7 +460,7 @@ void prepare_set3(lv_event_t *e) {
  lv_obj_set_style_bg_opa(ui_Panel18, 0, LV_PART_MAIN);            // 设置背景透明度 (0~255或LV_OPA_0~LV_OPA_100)
     prepare_set = 3;
     lv_obj_clear_flag(ui_Image24, LV_OBJ_FLAG_HIDDEN); /// Flags
-    lv_textarea_set_text(ui_TextArea29, "设定三");
+    screen_refresh_prepare_ui();
   }
 
   volatile static AXI_SRAM prepare_data pData;
