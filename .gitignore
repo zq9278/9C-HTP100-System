@@ -29,7 +29,7 @@ CMakeUserPresets.json
 
 # Keil MDK user and build outputs
 MDK-ARM/.vscode/
-MDK-ARM/H750-clion/
+MDK-ARM/9C-HTP100-screen/
 MDK-ARM/DebugConfig/
 MDK-ARM/*.uvoptx
 MDK-ARM/*.uvguix.*

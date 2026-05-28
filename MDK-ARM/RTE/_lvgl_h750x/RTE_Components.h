@@ -3,7 +3,7 @@
  * Auto generated Run-Time-Environment Configuration File
  *      *** Do not modify ! ***
  *
- * Project: 'H750-clion' 
+ * Project: '9C-HTP100-screen' 
  * Target:  'lvgl_h750x' 
  */
 
