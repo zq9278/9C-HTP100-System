@@ -154,28 +154,34 @@ static void set_version_text(void) {
 }
 
 void screen_refresh_prepare_ui(void) {
+  const char *target_text;
+  const char *current_text;
+
   if (ui_TextArea29 == NULL) {
     return;
   }
 
   switch (prepare_set) {
   case 1:
-    lv_textarea_set_text(ui_TextArea29,
-                         ui_lang_get() == UI_LANG_EN ? "Setting 1" : "设定一");
+    target_text = ui_lang_get() == UI_LANG_EN ? "Setting 1" : "设定一";
     break;
   case 2:
-    lv_textarea_set_text(ui_TextArea29,
-                         ui_lang_get() == UI_LANG_EN ? "Setting 2" : "设定二");
+    target_text = ui_lang_get() == UI_LANG_EN ? "Setting 2" : "设定二";
     break;
   case 3:
-    lv_textarea_set_text(ui_TextArea29,
-                         ui_lang_get() == UI_LANG_EN ? "Setting 3" : "设定三");
+    target_text = ui_lang_get() == UI_LANG_EN ? "Setting 3" : "设定三";
     break;
   default:
-    lv_textarea_set_text(ui_TextArea29,
-                         ui_lang_get() == UI_LANG_EN ? "Setting 1" : "设定一");
+    target_text = ui_lang_get() == UI_LANG_EN ? "Setting 1" : "设定一";
     break;
   }
+
+  current_text = lv_textarea_get_text(ui_TextArea29);
+  if (current_text != NULL && strcmp(current_text, target_text) == 0) {
+    return;
+  }
+
+  lv_textarea_set_text(ui_TextArea29, target_text);
 }
 
 void screen_refresh_runtime_ui(void) {

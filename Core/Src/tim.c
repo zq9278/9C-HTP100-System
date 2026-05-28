@@ -175,7 +175,7 @@ void MX_TIM13_Init(void)
   htim13.Instance = TIM13;
   htim13.Init.Prescaler = 23999;
   htim13.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim13.Init.Period = 1000;
+  htim13.Init.Period = 450;
   htim13.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim13.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim13) != HAL_OK)
@@ -230,7 +230,7 @@ void MX_TIM15_Init(void)
 
   /* USER CODE END TIM15_Init 1 */
   htim15.Instance = TIM15;
-  htim15.Init.Prescaler = 888;
+  htim15.Init.Prescaler = 1100;
   htim15.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim15.Init.Period = 99;
   htim15.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -256,7 +256,7 @@ void MX_TIM15_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM2;
-  sConfigOC.Pulse = 50;
+  sConfigOC.Pulse = 25;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
