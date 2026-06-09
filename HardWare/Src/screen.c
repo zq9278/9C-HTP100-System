@@ -53,6 +53,7 @@ static uint16_t auto_pressure = 0;
 static uint8_t battery_percent = 0;
 static uint8_t battery_percent_valid = 0;
 static uint32_t software_version = 20241226UL;
+static uint8_t screen_start_ack = 0;
 
 typedef struct {
   lv_coord_t width;
@@ -97,9 +98,9 @@ static void set_temperature_label(lv_obj_t *label, int16_t tenths) {
   }
 
   if (tenths < 0) {
-    lv_label_set_text_fmt(label, "-%d.%d", whole, fraction);
+    lv_label_set_text_fmt(label, "-%02d.%d", whole, fraction);
   } else {
-    lv_label_set_text_fmt(label, "%d.%d", whole, fraction);
+    lv_label_set_text_fmt(label, "%02d.%d", whole, fraction);
   }
 }
 
@@ -540,9 +541,18 @@ void processData_prepare(prepare_data_p msg) {
       screen_refresh_runtime_ui();
     }
     break;
+  case 0x00AD: // screen power-on ACK
+    if (data == 1U) {
+      screen_start_ack = 1U;
+    }
+    break;
   default:
     break;
   }
+}
+
+uint8_t screen_start_ack_received(void) {
+  return screen_start_ack;
 }
 
 /* 环形队列入队操作 */

@@ -125,8 +125,7 @@ void auto_set_value(lv_event_t *e) {
     lv_obj_set_style_text_color(ui_Label46, lv_color_make(255, 255, 255), 0); // 白色
     lv_obj_clear_flag(ui_Image55, LV_OBJ_FLAG_CLICKABLE); // 禁用点击
     // ui_auto_count_screen_init();
-    lv_label_set_text_fmt(ui_Label39, "%.1f",
-                          00.0); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
+    lv_label_set_text(ui_Label39, "00.0"); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
     lv_label_set_text_fmt(ui_Label46, "%03d",
                           000); // 鍒濆?嬪寲鑴夊姩鏄剧ず鏁板€?
 
@@ -203,7 +202,7 @@ void hot_start(lv_event_t *e) {
   seconds = 0;
   lv_label_set_text_fmt(ui_cut_d_l11, "%02d", minutes); // 鏄剧ず鍒嗛挓
   lv_label_set_text_fmt(ui_cut_d_l12, "%02d", 0);       // 鏄剧ず绉掗拡
-  lv_label_set_text_fmt(ui_Label30, "%.1f", 00.0); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
+  lv_label_set_text(ui_Label30, "00.0"); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
   pData.cmd_head_high = 0x5A;
   pData.cmd_head_low = 0xA5;
   pData.frame_length = 0x0d;
@@ -270,7 +269,7 @@ void auto_start(lv_event_t *e) {
   seconds = 0;
   lv_label_set_text_fmt(ui_cut_d_l31, "%02d", minutes); // 鏄剧ず鍒嗛挓
   lv_label_set_text_fmt(ui_cut_d_l32, "%02d", 0);       // 鏄剧ず绉掗拡
-  lv_label_set_text_fmt(ui_Label39, "%.1f", 00.0); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
+  lv_label_set_text(ui_Label39, "00.0"); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
   lv_label_set_text_fmt(ui_Label46, "%03d", 000); // 鍒濆?嬪寲鑴夊姩鏄剧ず鏁板€?
   // HAL_TIM_Base_Start_IT(&htim14);
   volatile static AXI_SRAM  CTRL_MSG pData;
@@ -671,7 +670,7 @@ void Factorymodecall(lv_event_t * e)
   seconds = 0;
   lv_label_set_text_fmt(ui_cut_d_l31, "%02d", minutes); // 鏄剧ず鍒嗛挓
   lv_label_set_text_fmt(ui_cut_d_l32, "%02d", 0);       // 鏄剧ず绉掗拡
-  lv_label_set_text_fmt(ui_Label39, "%.1f", 00.0); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
+  lv_label_set_text(ui_Label39, "00.0"); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
   lv_label_set_text_fmt(ui_Label46, "%03d", 000); // 鍒濆?嬪寲鑴夊姩鏄剧ず鏁板€?
 
  	float press_value = atof(lv_textarea_get_text(ui_TextArea2)); // 获取当前值

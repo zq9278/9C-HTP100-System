@@ -148,8 +148,7 @@ int main(void)
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
 __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 60);
-	uint8_t message_sent = 0;     // 消息发�?�标�?
-uint32_t start_time = HAL_GetTick();
+uint32_t last_screenstart_time = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -178,9 +177,10 @@ if (HAL_GetTick() - save_picture_time >= 1000) {
                    LV_OBJ_FLAG_HIDDEN); /// Flags
 }
 work_flinsh();
-        if ((HAL_GetTick() - start_time >= 1000) && !message_sent) {
-        screenstart();  // 发�?�一次消�?
-            message_sent = 1;           // 设置标志，防止重复发�?
+        if (!screen_start_ack_received() &&
+            (HAL_GetTick() - last_screenstart_time >= 1000U)) {
+            screenstart();
+            last_screenstart_time = HAL_GetTick();
         }
 	}
   /* USER CODE END 3 */

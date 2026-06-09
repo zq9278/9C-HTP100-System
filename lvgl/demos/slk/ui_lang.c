@@ -422,7 +422,7 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea4, "ON", INT16_MIN, INT16_MIN, 80, 36, font30);
     set_textarea(&ui_TextArea12, "OFF", 176, INT16_MIN, 88, 36, font30);
     set_textarea(&ui_TextArea9, "Language", INT16_MIN, INT16_MIN, 170, 42, font30);
-    set_textarea(&ui_TextArea40, "ZN", INT16_MIN, INT16_MIN, 70, 36, font30);
+    set_textarea(&ui_TextArea40, "ZH", INT16_MIN, INT16_MIN, 70, 36, font30);
     set_textarea(&ui_TextArea41, "EN", INT16_MIN, INT16_MIN, 70, 36, font30);
 
     set_label(&ui_Label13, "Confirm", INT16_MIN, INT16_MIN, 118, small);
