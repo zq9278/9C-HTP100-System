@@ -82,6 +82,9 @@ void  screenack(void);
 uint8_t screen_start_ack_received(void);
 void screen_refresh_prepare_ui(void);
 void screen_refresh_runtime_ui(void);
+void screen_reset_hotting_runtime_ui(void);
+void screen_reset_pulsationning_runtime_ui(void);
+void screen_reset_autoing_runtime_ui(void);
 HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart, uint8_t *data, uint16_t size);
 
 #endif /*__GT911_H_*/

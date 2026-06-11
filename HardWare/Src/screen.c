@@ -208,6 +208,23 @@ void screen_refresh_runtime_ui(void) {
   if (ui_Slider8 != NULL) lv_slider_set_value(ui_Slider8, battery_percent, LV_ANIM_ON);
 }
 
+void screen_reset_hotting_runtime_ui(void) {
+  hot_temperature_tenths = 0;
+  set_temperature_label(ui_Label30, hot_temperature_tenths);
+}
+
+void screen_reset_pulsationning_runtime_ui(void) {
+  pulsation_pressure = 0;
+  set_pressure_label(ui_Label32, pulsation_pressure);
+}
+
+void screen_reset_autoing_runtime_ui(void) {
+  auto_temperature_tenths = 0;
+  auto_pressure = 0;
+  set_temperature_label(ui_Label39, auto_temperature_tenths);
+  set_pressure_label(ui_Label46, auto_pressure);
+}
+
 void work_flinsh(void) {
   if (work_finish) {
 	work_finish=0;

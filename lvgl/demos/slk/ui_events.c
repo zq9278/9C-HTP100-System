@@ -125,9 +125,7 @@ void auto_set_value(lv_event_t *e) {
     lv_obj_set_style_text_color(ui_Label46, lv_color_make(255, 255, 255), 0); // 白色
     lv_obj_clear_flag(ui_Image55, LV_OBJ_FLAG_CLICKABLE); // 禁用点击
     // ui_auto_count_screen_init();
-    lv_label_set_text(ui_Label39, "00.0"); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
-    lv_label_set_text_fmt(ui_Label46, "%03d",
-                          000); // 鍒濆?嬪寲鑴夊姩鏄剧ず鏁板€?
+    screen_reset_autoing_runtime_ui();
 
     lv_obj_clear_flag(
         ui_Image75,
@@ -158,6 +156,7 @@ void auto_set_value(lv_event_t *e) {
     } else {
 			_ui_screen_change(&ui_autoing, LV_SCR_LOAD_ANIM_NONE, 0, 0,
                         &ui_autoing_screen_init);
+       screen_reset_autoing_runtime_ui();
 			 BEE1(e);
 			   work_mode = 3;
 			lv_label_set_text_fmt(ui_cut_d_l31, "%02d", prepare_time); // 鏄剧ず鍒嗛挓
@@ -202,7 +201,7 @@ void hot_start(lv_event_t *e) {
   seconds = 0;
   lv_label_set_text_fmt(ui_cut_d_l11, "%02d", minutes); // 鏄剧ず鍒嗛挓
   lv_label_set_text_fmt(ui_cut_d_l12, "%02d", 0);       // 鏄剧ず绉掗拡
-  lv_label_set_text(ui_Label30, "00.0"); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
+  screen_reset_hotting_runtime_ui();
   pData.cmd_head_high = 0x5A;
   pData.cmd_head_low = 0xA5;
   pData.frame_length = 0x0d;
@@ -234,7 +233,7 @@ void pulsation_start(lv_event_t *e) {
   seconds = 0;
   lv_label_set_text_fmt(ui_cut_d_l21, "%02d", minutes); // 鏄剧ず鍒嗛挓
   lv_label_set_text_fmt(ui_cut_d_l22, "%02d", 0);       // 鏄剧ず绉掗拡
-  lv_label_set_text_fmt(ui_Label32, "%03d", 000); // 鍒濆?嬪寲鑴夊姩鏄剧ず鏁板€?
+  screen_reset_pulsationning_runtime_ui();
   // HAL_TIM_Base_Start_IT(&htim14);
   volatile static AXI_SRAM  CTRL_MSG pData;
   extern lv_obj_t *ui_Panel69;
@@ -269,8 +268,7 @@ void auto_start(lv_event_t *e) {
   seconds = 0;
   lv_label_set_text_fmt(ui_cut_d_l31, "%02d", minutes); // 鏄剧ず鍒嗛挓
   lv_label_set_text_fmt(ui_cut_d_l32, "%02d", 0);       // 鏄剧ず绉掗拡
-  lv_label_set_text(ui_Label39, "00.0"); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
-  lv_label_set_text_fmt(ui_Label46, "%03d", 000); // 鍒濆?嬪寲鑴夊姩鏄剧ず鏁板€?
+  screen_reset_autoing_runtime_ui();
   // HAL_TIM_Base_Start_IT(&htim14);
   volatile static AXI_SRAM  CTRL_MSG pData;
   pData.cmd_head_high = 0x5A;
@@ -670,8 +668,7 @@ void Factorymodecall(lv_event_t * e)
   seconds = 0;
   lv_label_set_text_fmt(ui_cut_d_l31, "%02d", minutes); // 鏄剧ず鍒嗛挓
   lv_label_set_text_fmt(ui_cut_d_l32, "%02d", 0);       // 鏄剧ず绉掗拡
-  lv_label_set_text(ui_Label39, "00.0"); // 鍒濆?嬪寲娓╁害鏄剧ず鏁板€?
-  lv_label_set_text_fmt(ui_Label46, "%03d", 000); // 鍒濆?嬪寲鑴夊姩鏄剧ず鏁板€?
+  screen_reset_autoing_runtime_ui();
 
  	float press_value = atof(lv_textarea_get_text(ui_TextArea2)); // 获取当前值
   //float tempature_value = atof(lv_textarea_get_text(ui_TextArea9)); // 获取当前值
@@ -680,6 +677,7 @@ float tempature_value = 42.5; // 获取当前值
       BEE1(e);
       _ui_screen_change(&ui_autoing, LV_SCR_LOAD_ANIM_NONE, 0, 0,
                         &ui_autoing_screen_init);
+      screen_reset_autoing_runtime_ui();
       volatile static AXI_SRAM  CTRL_MSG pData;
       pData.cmd_head_high = 0x5A;
       pData.cmd_head_low = 0xA5;
