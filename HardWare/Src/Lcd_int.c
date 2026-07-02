@@ -83,8 +83,8 @@ void LCD_WriteData(uint8_t data)
     SPI_SendData(data);
     CSB_HIGH(); // 取消LCD激活
 }
-#define new 0
-#define old 1
+#define new 1
+#define old 0
 // LCD初始化函数`
 void LCD_Init(void)
 {
