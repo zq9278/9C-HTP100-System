@@ -565,7 +565,6 @@ void ui_autoing_screen_init(void)
     lv_obj_set_style_border_width(ui_TextArea22, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_add_event_cb(ui_TextArea53, ui_event_TextArea53, LV_EVENT_ALL, NULL);
-    lv_obj_add_event_cb(ui_TextArea49, ui_event_TextArea49, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_Image55, ui_event_Image55, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_TextArea50, ui_event_TextArea50, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_Image75, ui_event_Image75, LV_EVENT_ALL, NULL);

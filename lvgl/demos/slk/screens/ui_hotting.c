@@ -487,7 +487,6 @@ void ui_hotting_screen_init(void)
     lv_obj_set_style_bg_opa(ui_TextArea19, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(ui_TextArea19, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_add_event_cb(ui_TextArea45, ui_event_TextArea45, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_Image5, ui_event_Image5, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_TextArea51, ui_event_TextArea51, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_TextArea44, ui_event_TextArea44, LV_EVENT_ALL, NULL);

@@ -491,7 +491,6 @@ void ui_pulsationning_screen_init(void)
     lv_obj_set_style_border_width(ui_TextArea62, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_add_event_cb(ui_TextArea52, ui_event_TextArea52, LV_EVENT_ALL, NULL);
-    lv_obj_add_event_cb(ui_TextArea48, ui_event_TextArea48, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_Image22, ui_event_Image22, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_TextArea47, ui_event_TextArea47, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_Image74, ui_event_Image74, LV_EVENT_ALL, NULL);
