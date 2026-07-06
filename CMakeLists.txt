@@ -116,17 +116,24 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 # Generate a raw binary image alongside the ELF after linking.
 if(CMAKE_OBJCOPY)
     set(BINARY_OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.bin)
+    set(HEX_OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_PROJECT_NAME}.hex)
 
     add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_OBJCOPY} -O binary
             $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
             ${BINARY_OUTPUT_FILE}
-        BYPRODUCTS ${BINARY_OUTPUT_FILE}
-        COMMENT "Generating ${CMAKE_PROJECT_NAME}.bin"
+        COMMAND ${CMAKE_OBJCOPY} -O ihex
+            $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+            ${HEX_OUTPUT_FILE}
+        BYPRODUCTS
+            ${BINARY_OUTPUT_FILE}
+            ${HEX_OUTPUT_FILE}
+        COMMENT "Generating ${CMAKE_PROJECT_NAME}.bin and ${CMAKE_PROJECT_NAME}.hex"
     )
 
     set_property(TARGET ${CMAKE_PROJECT_NAME} APPEND PROPERTY
         ADDITIONAL_CLEAN_FILES
         ${BINARY_OUTPUT_FILE}
+        ${HEX_OUTPUT_FILE}
     )
 endif()
