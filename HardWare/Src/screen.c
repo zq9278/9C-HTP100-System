@@ -60,6 +60,10 @@ static volatile uint8_t startup_language_received = 0U;
 #define SCREEN_FAULT_REPORT_TIMEOUT  5000U
 #define SCREEN_HEARTBEAT_TIMEOUT     2000U
 #define SCREEN_COMMUNICATION_FAULT   0x0501U
+#define SCREEN_TREATMENT_ACK_ID       0x00AEU
+#define SCREEN_TREATMENT_ACK_TIMEOUT  200U
+#define SCREEN_TREATMENT_ACK_SLOTS    4U
+#define SCREEN_PROTOCOL_MAX_FRAME     13U
 
 LV_FONT_DECLARE(ui_font_popup40);
 
@@ -78,6 +82,106 @@ static uint8_t eye_state_received = 0U;
 static screen_popup_kind_t displayed_popup = SCREEN_POPUP_NONE;
 static uint32_t displayed_fault_code = 0U;
 static uint8_t displayed_popup_language = 0xFFU;
+
+typedef struct {
+  uint8_t active;
+  uint8_t retry_count;
+  uint16_t command;
+  uint16_t frame_size;
+  uint32_t sent_at_ms;
+  uint8_t frame[SCREEN_PROTOCOL_MAX_FRAME];
+} screen_treatment_pending_t;
+
+static screen_treatment_pending_t
+    treatment_pending[SCREEN_TREATMENT_ACK_SLOTS];
+static uint32_t treatment_ack_timeout_count;
+static uint32_t treatment_ack_queue_full_count;
+
+static HAL_StatusTypeDef uart_transmit_raw(UART_HandleTypeDef *huart,
+                                           uint8_t *data, uint16_t size);
+
+static uint8_t treatment_command_requires_ack(uint16_t command)
+{
+  switch (command) {
+  case 0x1041U: /* prepare heating */
+  case 0x1005U: /* prepare pressure */
+  case 0x1037U: /* prepare automatic */
+  case 0x1040U: /* start heating */
+  case 0x1006U: /* start pressure */
+  case 0x1036U: /* start automatic */
+  case 0x1030U: /* stop heating */
+  case 0x1034U: /* stop pressure */
+  case 0x1038U: /* stop automatic */
+  case 0x8900U: /* natural treatment finish */
+    return 1U;
+  default:
+    return 0U;
+  }
+}
+
+static void treatment_ack_arm(uint16_t command, const uint8_t *frame,
+                              uint16_t frame_size)
+{
+  screen_treatment_pending_t *slot = NULL;
+
+  if (frame == NULL || frame_size > SCREEN_PROTOCOL_MAX_FRAME) {
+    return;
+  }
+  for (uint8_t index = 0U; index < SCREEN_TREATMENT_ACK_SLOTS; ++index) {
+    if (treatment_pending[index].active &&
+        treatment_pending[index].command == command) {
+      slot = &treatment_pending[index];
+      break;
+    }
+    if (slot == NULL && !treatment_pending[index].active) {
+      slot = &treatment_pending[index];
+    }
+  }
+  if (slot == NULL) {
+    treatment_ack_queue_full_count++;
+    return;
+  }
+
+  memcpy(slot->frame, frame, frame_size);
+  slot->active = 1U;
+  slot->retry_count = 0U;
+  slot->command = command;
+  slot->frame_size = frame_size;
+  slot->sent_at_ms = HAL_GetTick();
+}
+
+static void treatment_ack_received(uint16_t command)
+{
+  for (uint8_t index = 0U; index < SCREEN_TREATMENT_ACK_SLOTS; ++index) {
+    if (treatment_pending[index].active &&
+        treatment_pending[index].command == command) {
+      treatment_pending[index].active = 0U;
+      return;
+    }
+  }
+}
+
+void screen_treatment_ack_tick(void)
+{
+  uint32_t now = HAL_GetTick();
+
+  for (uint8_t index = 0U; index < SCREEN_TREATMENT_ACK_SLOTS; ++index) {
+    screen_treatment_pending_t *slot = &treatment_pending[index];
+
+    if (!slot->active ||
+        now - slot->sent_at_ms < SCREEN_TREATMENT_ACK_TIMEOUT) {
+      continue;
+    }
+    if (slot->retry_count == 0U) {
+      (void)uart_transmit_raw(&huart1, slot->frame, slot->frame_size);
+      slot->retry_count = 1U;
+      slot->sent_at_ms = now;
+    } else {
+      slot->active = 0U;
+      treatment_ack_timeout_count++;
+    }
+  }
+}
 
 void screen_preload_language_from_uart(const uint8_t *data, uint16_t size) {
   const uint16_t frame_size = (uint16_t)sizeof(prepare_data);
@@ -697,6 +801,9 @@ void processData_prepare(prepare_data_p msg) {
       screen_start_ack = 1U;
     }
     break;
+  case SCREEN_TREATMENT_ACK_ID:
+    treatment_ack_received(data);
+    break;
   default:
     break;
   }
@@ -920,8 +1027,8 @@ HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart,
 
 #define UART_TX_TIMEOUT_MS 20U
 
-HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart,
-                                         uint8_t *data, uint16_t size)
+static HAL_StatusTypeDef uart_transmit_raw(UART_HandleTypeDef *huart,
+                                           uint8_t *data, uint16_t size)
 {
   HAL_StatusTypeDef status = HAL_ERROR;
 
@@ -940,6 +1047,21 @@ HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart,
     }
     if (attempt + 1U < MAX_RETRIES) {
       HAL_Delay(1U);
+    }
+  }
+  return status;
+}
+
+HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart,
+                                         uint8_t *data, uint16_t size)
+{
+  HAL_StatusTypeDef status = uart_transmit_raw(huart, data, size);
+
+  if (status == HAL_OK && size >= 5U && data[0] == 0x5AU &&
+      data[1] == 0xA5U) {
+    uint16_t command = (uint16_t)((uint16_t)data[3] << 8U) | data[4];
+    if (treatment_command_requires_ack(command)) {
+      treatment_ack_arm(command, data, size);
     }
   }
   return status;

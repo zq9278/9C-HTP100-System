@@ -191,6 +191,7 @@ __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
                                            sizeof(serial_data))) != 0U) {
             Serial_data_stream_parsing(serial_data, received);
         }
+        screen_treatment_ack_tick();
      /* Apply every pending startup setting before LVGL's first draw. */
      lv_timer_handler();
         screen_fault_popup_tick();
