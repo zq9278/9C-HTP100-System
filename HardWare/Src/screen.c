@@ -410,7 +410,6 @@ void work_flinsh(void) {
       pData.end_high = 0xFF;
       pData.end_low = 0xFF;
       UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-			UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
     }
   }
 }
@@ -712,6 +711,7 @@ uint8_t screen_start_language_received(void) {
 }
 
 /* 环形队列入队操作 */
+#if 0
 int RingQueue_Push(RingQueue *queue, UART_RX_TypeDef *data) {
   if (queue->count >= UART_QUEUE_SIZE) {
     return -1; // 队列已满，无法入队
@@ -732,6 +732,7 @@ UART_RX_TypeDef *RingQueue_Pop(RingQueue *queue) {
   queue->count--;                                     // 更新计数
   return data;                                        // 返回数据指针
 }
+#endif
 /* 计算 CRC 校验值 */
 uint16_t Calculate_CRC(uint8_t *data, uint16_t length) {
   uint16_t crc = 0xFFFF; // 初始 CRC 值
@@ -748,7 +749,7 @@ uint16_t Calculate_CRC(uint8_t *data, uint16_t length) {
   return crc; // 返回计算结果
 }
 
-
+#if 0
 void Serial_data_stream_parsing(UART_RX_TypeDef *frameData) {
   if (frameData == NULL) {
     // printf("Error: Invalid frameData pointer or size\n");
@@ -795,9 +796,104 @@ void Serial_data_stream_parsing(UART_RX_TypeDef *frameData) {
     }
   }
 }
+#endif
+
+#define UART_PROTOCOL_STREAM_SIZE 512U
+
+static uint8_t protocol_rx_stream[UART_PROTOCOL_STREAM_SIZE];
+static size_t protocol_rx_length;
+
+static uint8_t protocol_header_valid(const uint8_t *frame)
+{
+  return (uint8_t)(((frame[0] == 0x5AU) && (frame[1] == 0xA5U)) ||
+                   ((frame[0] == 0x6AU) && (frame[1] == 0xA6U)));
+}
+
+static size_t protocol_expected_frame_size(const uint8_t *frame)
+{
+  return (frame[0] == 0x5AU) ? sizeof(CTRL_MSG) : sizeof(prepare_data);
+}
+
+static uint8_t protocol_frame_valid(const uint8_t *frame, size_t frame_size)
+{
+  uint16_t received_crc;
+  uint16_t calculated_crc;
+
+  if (!protocol_header_valid(frame) || frame[2] != frame_size ||
+      frame[frame_size - 2U] != FRAME_TAIL_BYTE1 ||
+      frame[frame_size - 1U] != FRAME_TAIL_BYTE2) {
+    return 0U;
+  }
+
+  received_crc = (uint16_t)frame[frame_size - 4U] |
+                 (uint16_t)((uint16_t)frame[frame_size - 3U] << 8U);
+  calculated_crc = Calculate_CRC((uint8_t *)frame,
+                                 (uint16_t)(frame_size - 4U));
+  return (uint8_t)(received_crc == calculated_crc);
+}
+
+void Serial_data_stream_parsing(const uint8_t *data, size_t length)
+{
+  if (data == NULL || length == 0U) {
+    return;
+  }
+
+  if (length > sizeof(protocol_rx_stream) - protocol_rx_length) {
+    protocol_rx_length = 0U;
+    if (length > sizeof(protocol_rx_stream)) {
+      data += length - sizeof(protocol_rx_stream);
+      length = sizeof(protocol_rx_stream);
+    }
+  }
+  memcpy(&protocol_rx_stream[protocol_rx_length], data, length);
+  protocol_rx_length += length;
+
+  while (protocol_rx_length >= 3U) {
+    size_t start = 0U;
+    size_t frame_size;
+
+    while (start + 1U < protocol_rx_length &&
+           !protocol_header_valid(&protocol_rx_stream[start])) {
+      ++start;
+    }
+    if (start > 0U) {
+      memmove(protocol_rx_stream, &protocol_rx_stream[start],
+              protocol_rx_length - start);
+      protocol_rx_length -= start;
+    }
+    if (protocol_rx_length < 3U) {
+      return;
+    }
+
+    frame_size = protocol_expected_frame_size(protocol_rx_stream);
+    if (protocol_rx_stream[2] != frame_size) {
+      memmove(protocol_rx_stream, &protocol_rx_stream[1],
+              protocol_rx_length - 1U);
+      protocol_rx_length--;
+      continue;
+    }
+    if (protocol_rx_length < frame_size) {
+      return;
+    }
+
+    if (protocol_frame_valid(protocol_rx_stream, frame_size)) {
+      command_parsing(protocol_rx_stream);
+      memmove(protocol_rx_stream, &protocol_rx_stream[frame_size],
+              protocol_rx_length - frame_size);
+      protocol_rx_length -= frame_size;
+    } else {
+      /* Skip one byte after a damaged frame so the next valid header can be
+       * recovered even if it began inside the declared frame length. */
+      memmove(protocol_rx_stream, &protocol_rx_stream[1],
+              protocol_rx_length - 1U);
+      protocol_rx_length--;
+    }
+  }
+}
 
 #define MAX_RETRIES 3 // 最大重试次数
 #define TIMEOUT 1000  // 发送超时时间，单位为毫秒
+#if 0
 volatile uint8_t uart_tx_done = 1;
 
 // 封装的函数
@@ -820,6 +916,34 @@ HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart,
     return HAL_OK;
 
 }
+#endif
+
+#define UART_TX_TIMEOUT_MS 20U
+
+HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart,
+                                         uint8_t *data, uint16_t size)
+{
+  HAL_StatusTypeDef status = HAL_ERROR;
+
+  if (huart == NULL || data == NULL || size == 0U) {
+    return HAL_ERROR;
+  }
+
+  /* Protocol frames are only 11 or 13 bytes. Polling transmission completes
+   * in about 1.1 ms at 115200 baud and avoids DMA buffer lifetime/cache
+   * problems. A short retry only applies when the peripheral is temporarily
+   * busy or a real timeout/error is reported. */
+  for (uint8_t attempt = 0U; attempt < MAX_RETRIES; ++attempt) {
+    status = HAL_UART_Transmit(huart, data, size, UART_TX_TIMEOUT_MS);
+    if (status == HAL_OK) {
+      return HAL_OK;
+    }
+    if (attempt + 1U < MAX_RETRIES) {
+      HAL_Delay(1U);
+    }
+  }
+  return status;
+}
 
 void screenstart(void) {
   static AXI_SRAM CTRL_MSG pData;
@@ -832,10 +956,7 @@ void screenstart(void) {
   pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
   pData.end_high = 0xFF;
   pData.end_low = 0xFF;
-  /* The startup handshake must not inherit the normal 20 ms inter-frame
-   * delay. A short blocking transmit is safe here and completes in ~1.2 ms
-   * at 115200 baud. */
-  (void)HAL_UART_Transmit(&huart1, (uint8_t *)&pData, sizeof(pData), 100U);
+  (void)UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
 }
 void screenack(void) {
   static AXI_SRAM CTRL_MSG pData;

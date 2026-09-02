@@ -62,9 +62,11 @@ extern uint8_t Tim7_flag_60ms;
 extern uint16_t Tim7_flag_1s;
 extern TIM_HandleTypeDef htim1;
 
+#if 0
 extern RingQueue uartRingQueue; // 初始化队�???
 extern UART_RX_TypeDef uart_rx_data_t[UART_BUFFER_QUANTITY]; // 双缓冲数据存�???
 extern uint8_t uart_buff_ctrl; // 缓冲区索�???
+#endif
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -177,9 +179,17 @@ __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
 			
 		}
      //HAL_Delay(90);
+#if 0
         UART_RX_TypeDef *frameData;
         while ((frameData = RingQueue_Pop(&uartRingQueue)) != NULL) {
             Serial_data_stream_parsing(frameData); // 解析数据�???
+        }
+#endif
+        uint8_t serial_data[128];
+        size_t received;
+        while ((received = ScreenUart_Read(serial_data,
+                                           sizeof(serial_data))) != 0U) {
+            Serial_data_stream_parsing(serial_data, received);
         }
      /* Apply every pending startup setting before LVGL's first draw. */
      lv_timer_handler();

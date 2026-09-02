@@ -535,6 +535,7 @@ void LTDC_IRQHandler(void)
 LTDC->ICR = (uint32_t)LTDC_IER_LIE;
         wTransferState = 1;
 }
+#if 0
 extern volatile uint8_t uart_tx_done;
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -542,6 +543,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
         uart_tx_done = 1;
     }
 }
+#endif
 void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
     if (hi2c->Instance == hi2c4.Instance) {
         __HAL_RCC_I2C1_CLK_DISABLE();// 关闭 I2C 时钟

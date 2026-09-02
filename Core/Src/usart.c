@@ -24,9 +24,69 @@
 #include <stdio.h>
 #include "screen.h"
 
+#if 0
+
 RingQueue uartRingQueue = { .head = 0, .tail = 0, .count = 0 }; // 初始化队�????
 AXI_SRAM UART_RX_TypeDef uart_rx_data_t[UART_BUFFER_QUANTITY]; // 双缓冲数据存�????
 volatile uint8_t uart_buff_ctrl = 0; // 缓冲区索�????
+#endif
+
+#define UART_RX_STREAM_SIZE 512U
+
+/* DMA owns this buffer while reception is active. Keep it cache-line aligned
+ * so cache maintenance cannot touch unrelated application data. */
+static AXI_SRAM __attribute__((aligned(32))) uint8_t uart_rx_dma[UART_RX_BUFFER_SIZE];
+static uint8_t uart_rx_stream[UART_RX_STREAM_SIZE];
+static volatile uint16_t uart_rx_write;
+static volatile uint16_t uart_rx_read;
+static volatile uint32_t uart_rx_overflow_count;
+static volatile uint32_t uart_rx_restart_error_count;
+
+static void uart_rx_dma_invalidate(void)
+{
+  SCB_InvalidateDCache_by_Addr((uint32_t *)uart_rx_dma,
+                              (int32_t)sizeof(uart_rx_dma));
+}
+
+static HAL_StatusTypeDef screen_uart_start_receive(void)
+{
+  HAL_StatusTypeDef status;
+
+  uart_rx_dma_invalidate();
+  status = HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_dma,
+                                       sizeof(uart_rx_dma));
+  if (status == HAL_OK) {
+    /* RxEvent must represent IDLE or a full buffer. Treating the 128-byte
+     * half-transfer callback as a completed block corrupts buffer ownership. */
+    __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
+  }
+  return status;
+}
+
+static void screen_uart_store_from_isr(const uint8_t *data, uint16_t length)
+{
+  for (uint16_t index = 0U; index < length; ++index) {
+    uint16_t next = (uint16_t)((uart_rx_write + 1U) % UART_RX_STREAM_SIZE);
+    if (next == uart_rx_read) {
+      uart_rx_overflow_count++;
+      break;
+    }
+    uart_rx_stream[uart_rx_write] = data[index];
+    uart_rx_write = next;
+  }
+}
+
+size_t ScreenUart_Read(uint8_t *destination, size_t capacity)
+{
+  size_t count = 0U;
+
+  while (destination != NULL && count < capacity &&
+         uart_rx_read != uart_rx_write) {
+    destination[count++] = uart_rx_stream[uart_rx_read];
+    uart_rx_read = (uint16_t)((uart_rx_read + 1U) % UART_RX_STREAM_SIZE);
+  }
+  return count;
+}
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;
@@ -73,10 +133,19 @@ void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
+#if 0
   SCB_CleanInvalidateDCache();
   HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_data_t[uart_buff_ctrl].buffer, UART_RX_BUFFER_SIZE); // �????启DMA接收
     // 启动空闲中断接收 (可�?�，增强接收能力)
     __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+#endif
+  uart_rx_write = 0U;
+  uart_rx_read = 0U;
+  uart_rx_overflow_count = 0U;
+  uart_rx_restart_error_count = 0U;
+  if (screen_uart_start_receive() != HAL_OK) {
+    Error_Handler();
+  }
   /* USER CODE END USART1_Init 2 */
 
 }
@@ -196,6 +265,7 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 // 	HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 100);	// ��?????��???????
 // 	return (ch);
 // }
+#if 0
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
    if (huart->Instance == USART1) { // 确保�???? USART1
@@ -223,6 +293,40 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
        HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_data_t[uart_buff_ctrl].buffer, UART_RX_BUFFER_SIZE); // �????启DMA接收
        HAL_GPIO_WritePin(GPIOH, GPIO_PIN_14, GPIO_PIN_RESET);
     }
+}
+#endif
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+  if (huart->Instance != USART1) {
+    return;
+  }
+
+  /* A half-transfer event does not release the DMA buffer. It is disabled
+   * when reception starts, but retain this guard for defensive recovery. */
+  if (HAL_UARTEx_GetRxEventType(huart) == HAL_UART_RXEVENT_HT) {
+    return;
+  }
+
+  if (Size > 0U && Size <= sizeof(uart_rx_dma)) {
+    uart_rx_dma_invalidate();
+    screen_preload_language_from_uart(uart_rx_dma, Size);
+    screen_uart_store_from_isr(uart_rx_dma, Size);
+  }
+
+  if (screen_uart_start_receive() != HAL_OK) {
+    uart_rx_restart_error_count++;
+  }
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == USART1) {
+    (void)HAL_UART_AbortReceive(huart);
+    if (screen_uart_start_receive() != HAL_OK) {
+      uart_rx_restart_error_count++;
+    }
+  }
 }
 
 int fputc(int ch,FILE *f)//重定向printf

@@ -1,21 +1,15 @@
 #include "main.h" 
+#include <stddef.h>
 #ifndef __screen_H
 #define __screen_H
 #define AXI_SRAM __attribute__((section(".AXI_SRAM")))
 
 #define UART_RX_BUFFER_SIZE  256 // 串口接收缓冲区大小
-#define UART_BUFFER_QUANTITY 10   // 使用双缓冲
 #define FRAME_HEADER_BYTE1   0x5A // 帧头第一个字节
 #define FRAME_HEADER_BYTE2   0xA5 // 帧头第二个字节
 #define FRAME_TAIL_BYTE1     0xFF // 帧尾第一个字节
 #define FRAME_TAIL_BYTE2     0xFF // 帧尾第二个字节
-#define UART_QUEUE_SIZE      10   // 环形缓冲队列大小
 extern uint8_t EYE_status;
-// 串口接收结构体
-typedef struct {
-    uint8_t buffer[UART_RX_BUFFER_SIZE]; // 数据缓冲区
-    uint16_t size; // 实际接收数据长度
-} UART_RX_TypeDef;
 
 typedef struct __attribute__((packed)) {
     uint8_t cmd_head_high; // 
@@ -58,20 +52,9 @@ typedef struct __attribute__((packed)){
 
 
 
-// 环形缓冲队列结构体
-typedef struct {
-    UART_RX_TypeDef *buffer[UART_QUEUE_SIZE]; // 存储数据的指针数组
-    volatile uint8_t head; // 队列头索引
-    volatile uint8_t tail; // 队列尾索引
-    volatile uint8_t count; // 队列中数据数量
-} RingQueue;
-
-
-
 uint16_t Calculate_CRC(uint8_t *data, uint16_t length); // 计算CRC校验值
-int RingQueue_Push(RingQueue *queue, UART_RX_TypeDef *data); // 环形队列入队
-UART_RX_TypeDef *RingQueue_Pop(RingQueue *queue); // 环形队列出队
-void Serial_data_stream_parsing(UART_RX_TypeDef *frameData);
+size_t ScreenUart_Read(uint8_t *destination, size_t capacity);
+void Serial_data_stream_parsing(const uint8_t *data, size_t length);
 void screen_preload_language_from_uart(const uint8_t *data, uint16_t size);
 void command_parsing(const uint8_t *received_data);
 void processData(PCTRL_MSG msg);
