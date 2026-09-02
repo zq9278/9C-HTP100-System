@@ -23,6 +23,12 @@ uint16_t prepare_set = 0;
 
 lv_obj_t *global_panel = NULL;
 
+void screen_refresh_prepare_ui(void) {}
+void screen_refresh_runtime_ui(void) {}
+void screen_reset_hotting_runtime_ui(void) {}
+void screen_reset_pulsationning_runtime_ui(void) {}
+void screen_reset_autoing_runtime_ui(void) {}
+
 void HAL_GPIO_WritePin(int port, int pin, int state)
 {
     (void)port;

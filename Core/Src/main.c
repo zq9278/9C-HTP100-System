@@ -122,6 +122,21 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
+  MX_USART1_UART_Init();
+
+  /* USART1 RX is already armed here. Send the power-on command before any
+   * display, touch, timer or UI initialization can delay the handshake. */
+  screenstart();
+  uint32_t last_screenstart_time = HAL_GetTick();
+  uint32_t language_wait_started = HAL_GetTick();
+
+  /* Let the controller return the persisted language before LCD/LVGL can
+   * construct a frame in the default language. USART1 RX DMA is active. */
+  while (!screen_start_language_received() &&
+         HAL_GetTick() - language_wait_started < 250U) {
+    __WFI();
+  }
+
   MX_TIM7_Init();
   MX_TIM15_Init();
   MX_DMA2D_Init();
@@ -131,7 +146,6 @@ int main(void)
   MX_FMC_Init();
   MX_SPI1_Init();
   MX_I2C4_Init();
-  MX_USART1_UART_Init();
   MX_TIM13_Init();
   MX_TIM1_Init();
 
@@ -148,7 +162,6 @@ int main(void)
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
 __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 60);
-uint32_t last_screenstart_time = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -164,11 +177,13 @@ uint32_t last_screenstart_time = HAL_GetTick();
 			
 		}
      //HAL_Delay(90);
-     lv_timer_handler();
-        UART_RX_TypeDef *frameData = RingQueue_Pop(&uartRingQueue); // 从环形队列取出数�???
-        if (frameData != NULL) {
+        UART_RX_TypeDef *frameData;
+        while ((frameData = RingQueue_Pop(&uartRingQueue)) != NULL) {
             Serial_data_stream_parsing(frameData); // 解析数据�???
         }
+     /* Apply every pending startup setting before LVGL's first draw. */
+     lv_timer_handler();
+        screen_fault_popup_tick();
         screen_refresh_runtime_ui();
 		
     HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_15);

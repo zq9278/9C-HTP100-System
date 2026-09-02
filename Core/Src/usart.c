@@ -199,13 +199,19 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
    if (huart->Instance == USART1) { // 确保�???? USART1
+        UART_RX_TypeDef *completed_data = NULL;
         if (Size > 0 && Size <= UART_RX_BUFFER_SIZE) {
             uart_rx_data_t[uart_buff_ctrl].size = Size; // 存储接收数据长度
             UART_RX_TypeDef *pUartData = &uart_rx_data_t[uart_buff_ctrl]; // 取当前缓冲区数据
+            completed_data = pUartData;
             RingQueue_Push(&uartRingQueue, pUartData); // 数据存入环形队列
             uart_buff_ctrl = (uart_buff_ctrl + 1) % UART_BUFFER_QUANTITY; // 切换到下�????个缓冲区
         }
 				SCB_CleanInvalidateDCache();
+        if (completed_data != NULL) {
+            screen_preload_language_from_uart(completed_data->buffer,
+                                              completed_data->size);
+        }
         HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_data_t[uart_buff_ctrl].buffer, UART_RX_BUFFER_SIZE); // 重新启动DMA接收
     }
 }

@@ -54,6 +54,141 @@ static uint8_t battery_percent = 0;
 static uint8_t battery_percent_valid = 0;
 static uint32_t software_version = 20241226UL;
 static uint8_t screen_start_ack = 0;
+static volatile uint8_t startup_language_received = 0U;
+
+#define SCREEN_FAULT_STATUS_ID       0x2F01U
+#define SCREEN_FAULT_REPORT_TIMEOUT  5000U
+#define SCREEN_HEARTBEAT_TIMEOUT     2000U
+#define SCREEN_COMMUNICATION_FAULT   0x0501U
+
+LV_FONT_DECLARE(ui_font_popup40);
+
+typedef enum {
+  SCREEN_POPUP_NONE = 0,
+  SCREEN_POPUP_EYE_OFFLINE,
+  SCREEN_POPUP_FAULT,
+  SCREEN_POPUP_HOST_LOST
+} screen_popup_kind_t;
+
+static uint32_t active_fault_code = 0U;
+static uint32_t last_fault_report_ms = 0U;
+static uint32_t last_battery_heartbeat_ms = 0U;
+static uint8_t heartbeat_timer_started = 0U;
+static uint8_t eye_state_received = 0U;
+static screen_popup_kind_t displayed_popup = SCREEN_POPUP_NONE;
+static uint32_t displayed_fault_code = 0U;
+static uint8_t displayed_popup_language = 0xFFU;
+
+void screen_preload_language_from_uart(const uint8_t *data, uint16_t size) {
+  const uint16_t frame_size = (uint16_t)sizeof(prepare_data);
+
+  if (data == NULL || size < frame_size) {
+    return;
+  }
+
+  for (uint16_t i = 0U; i + frame_size <= size; ++i) {
+    const uint8_t *frame = &data[i];
+    uint16_t received_crc;
+    uint16_t language_value;
+
+    if (frame[0] != 0x6AU || frame[1] != 0xA6U ||
+        frame[2] != frame_size || frame[3] != 0x00U || frame[4] != 0xABU ||
+        frame[frame_size - 2U] != 0xFFU || frame[frame_size - 1U] != 0xFFU) {
+      continue;
+    }
+
+    received_crc = (uint16_t)frame[frame_size - 4U] |
+                   (uint16_t)((uint16_t)frame[frame_size - 3U] << 8U);
+    if (Calculate_CRC((uint8_t *)frame, frame_size - 4U) != received_crc) {
+      continue;
+    }
+
+    language_value = (uint16_t)frame[5] | (uint16_t)((uint16_t)frame[6] << 8U);
+    if (language_value <= UI_LANG_EN) {
+      ui_lang_preselect(language_value);
+      startup_language_received = 1U;
+    }
+  }
+}
+
+void screen_fault_popup_tick(void) {
+  uint32_t now = HAL_GetTick();
+  uint8_t language = (uint8_t)ui_lang_get();
+  uint8_t host_lost;
+  screen_popup_kind_t wanted;
+  char text[64];
+
+  if (!heartbeat_timer_started) {
+    heartbeat_timer_started = 1U;
+    last_battery_heartbeat_ms = now;
+  }
+
+  if (active_fault_code != 0U &&
+      now - last_fault_report_ms >= SCREEN_FAULT_REPORT_TIMEOUT) {
+    active_fault_code = 0U;
+  }
+
+  host_lost = (now - last_battery_heartbeat_ms >= SCREEN_HEARTBEAT_TIMEOUT);
+  if (eye_state_received && EYE_status == 0U) {
+    wanted = SCREEN_POPUP_EYE_OFFLINE;
+  } else if (active_fault_code == SCREEN_COMMUNICATION_FAULT) {
+    /* The controller's screen-timeout fault and the local heartbeat timeout
+     * describe the same problem. Present one consistent popup. */
+    wanted = SCREEN_POPUP_HOST_LOST;
+  } else if (active_fault_code != 0U) {
+    wanted = SCREEN_POPUP_FAULT;
+  } else if (host_lost) {
+    wanted = SCREEN_POPUP_HOST_LOST;
+  } else {
+    wanted = SCREEN_POPUP_NONE;
+  }
+
+  if (wanted == SCREEN_POPUP_NONE) {
+    if (global_panel != NULL) {
+      lv_obj_add_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
+    }
+    displayed_popup = SCREEN_POPUP_NONE;
+    return;
+  }
+
+  create_global_panel();
+  if (global_panel == NULL) {
+    return;
+  }
+
+  if (wanted != displayed_popup || language != displayed_popup_language ||
+      (wanted == SCREEN_POPUP_FAULT && active_fault_code != displayed_fault_code)) {
+    if (wanted == SCREEN_POPUP_EYE_OFFLINE) {
+      global_panel_set_content(ui_lang_get() == UI_LANG_EN ?
+                               "Shield invalid\nReplace shield" :
+                               "检测眼盾无效\n请更换眼盾",
+                               ui_lang_get() == UI_LANG_EN ?
+                               "Back to Home" : "返回首页");
+    } else if (wanted == SCREEN_POPUP_FAULT) {
+      if (ui_lang_get() == UI_LANG_EN) {
+        snprintf(text, sizeof(text), "Fault code: 0x%04lX",
+                 (unsigned long)active_fault_code);
+      } else {
+        snprintf(text, sizeof(text), "故障码: 0x%04lX",
+                 (unsigned long)active_fault_code);
+      }
+      global_panel_set_content(text, ui_lang_get() == UI_LANG_EN ?
+                               "Back to Home" : "返回首页");
+    } else {
+      global_panel_set_content(ui_lang_get() == UI_LANG_EN ?
+                               "Communication failed" : "通讯失败",
+                               ui_lang_get() == UI_LANG_EN ?
+                               "Back to Home" : "返回首页");
+    }
+    displayed_popup = wanted;
+    displayed_fault_code = active_fault_code;
+    displayed_popup_language = language;
+  }
+
+  /* The Return Home button may hide the panel. Reassert it while the
+   * corresponding condition is still active. */
+  lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
+}
 
 typedef struct {
   lv_coord_t width;
@@ -295,7 +430,7 @@ void command_parsing(
   switch (cmd_type) {
   case 0x5aa5: { // 命令类型 0x9000 - 处理 UART1 数据
     uint16_t message_type = ((uint16_t)received_data[3] << 8) | received_data[4];
-    if (message_type == 0x2060U) {
+    if (message_type == 0x2060U || message_type == SCREEN_FAULT_STATUS_ID) {
       processData_u32((PCTRL_MSG_U32)received_data);
     } else {
       processData((PCTRL_MSG)received_data); // process data from uart
@@ -342,6 +477,8 @@ void processData(PCTRL_MSG msg) {
   case 0x2050: // 跟新电池
     battery_percent = (uint8_t)data;
     battery_percent_valid = 1;
+    last_battery_heartbeat_ms = HAL_GetTick();
+    heartbeat_timer_started = 1U;
     screen_refresh_runtime_ui();
     break;
   case 0x2051: // 主机发送停�??            
@@ -412,27 +549,17 @@ void processData(PCTRL_MSG msg) {
     lv_obj_set_style_bg_img_recolor_opa(ui_Slider1, 00,
                                         LV_PART_INDICATOR | LV_STATE_DEFAULT);
     break;
-   case 0x2055:
-        
-  //if(global_panel != NULL){
-	 if (data == 1.0) {
-        // **只有当 global_panel 不是隐藏状态时，才执行隐藏**
-        //if (!lv_obj_has_flag(global_panel, LV_OBJ_FLAG_HIDDEN)) {
-					if (global_panel != NULL) {
-            lv_obj_add_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
-				
-        }
-        EYE_status=1;
-    } else {
-_ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
-			work_mode=0;
-			create_global_panel();
-			EYE_status=0;
-lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);  // 让 panel 可见
-       
-	}
-	
-
+  case 0x2055:
+    EYE_status = (data == 1.0f) ? 1U : 0U;
+    eye_state_received = 1U;
+    if (EYE_status == 0U) {
+      if (lv_scr_act() != ui_home_page) {
+        _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0,
+                          &ui_home_page_screen_init);
+      }
+      work_mode = 0;
+    }
+    screen_fault_popup_tick();
     break;
   default:
     break;
@@ -446,6 +573,11 @@ void processData_u32(PCTRL_MSG_U32 msg) {
   case 0x2060:
     software_version = msg->value;
     screen_refresh_runtime_ui();
+    break;
+  case SCREEN_FAULT_STATUS_ID:
+    active_fault_code = msg->value;
+    last_fault_report_ms = HAL_GetTick();
+    screen_fault_popup_tick();
     break;
   default:
     break;
@@ -553,7 +685,10 @@ void processData_prepare(prepare_data_p msg) {
     ui_lang_apply_bee_state();
     break;
   case 0x00AB: // language
-    if (data <= 1U) {
+    /* The early UART callback already uses this frame to select the language
+     * before ui_init(). It remains in the queue and is parsed again later, so
+     * only redraw the UI when the language actually changes. */
+    if ((data <= 1U) && (ui_lang_get() != data)) {
       ui_lang_set(data);
       screen_refresh_runtime_ui();
     }
@@ -570,6 +705,10 @@ void processData_prepare(prepare_data_p msg) {
 
 uint8_t screen_start_ack_received(void) {
   return screen_start_ack;
+}
+
+uint8_t screen_start_language_received(void) {
+  return startup_language_received;
 }
 
 /* 环形队列入队操作 */
@@ -693,7 +832,10 @@ void screenstart(void) {
   pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
   pData.end_high = 0xFF;
   pData.end_low = 0xFF;
-  UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
+  /* The startup handshake must not inherit the normal 20 ms inter-frame
+   * delay. A short blocking transmit is safe here and completes in ~1.2 ms
+   * at 115200 baud. */
+  (void)HAL_UART_Transmit(&huart1, (uint8_t *)&pData, sizeof(pData), 100U);
 }
 void screenack(void) {
   static AXI_SRAM CTRL_MSG pData;

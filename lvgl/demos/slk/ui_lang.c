@@ -416,7 +416,9 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea5, "Pressure Value:", INT16_MIN, INT16_MIN, 235, 38, mid);
     set_textarea(&ui_TextArea6, "Treatment Time:", INT16_MIN, INT16_MIN, 235, 38, mid);
     set_textarea(&ui_TextArea10, "Saved!", INT16_MIN, INT16_MIN, 100, 34, font30);
-    set_textarea(&ui_TextArea7, "Save", INT16_MIN, INT16_MIN, 110, 36, font30);
+    /* Compensate for the Latin font baseline so the visible word, rather
+     * than the textarea box, is vertically centered in the save button. */
+    set_textarea_ex(&ui_TextArea7, "Save", INT16_MIN, -5, 110, 36, font30, 1);
 
     set_textarea(&ui_TextArea11, "Key Tone", INT16_MIN, INT16_MIN, 150, 42, font30);
     set_textarea(&ui_TextArea4, "ON", INT16_MIN, INT16_MIN, 80, 36, font30);
@@ -436,6 +438,13 @@ static void apply_en_texts(void)
 uint16_t ui_lang_get(void)
 {
     return language == UI_LANG_EN ? UI_LANG_EN : UI_LANG_ZH;
+}
+
+void ui_lang_preselect(uint16_t lang)
+{
+    /* UART RX may call this before LVGL objects exist. Only store the choice;
+     * ui_init() will apply it when all screens have been created. */
+    language = (lang == UI_LANG_EN) ? UI_LANG_EN : UI_LANG_ZH;
 }
 
 void ui_lang_apply_bee_state(void)
@@ -492,7 +501,7 @@ void ui_lang_apply_all(void)
 
 void ui_lang_set(uint16_t lang)
 {
-    language = (lang == UI_LANG_EN) ? UI_LANG_EN : UI_LANG_ZH;
+    ui_lang_preselect(lang);
     ui_lang_apply_all();
 }
 

@@ -11,6 +11,7 @@ extern "C" {
 #define UI_LANG_EN 1
 
 void ui_lang_set(uint16_t lang);
+void ui_lang_preselect(uint16_t lang);
 uint16_t ui_lang_get(void);
 void ui_lang_apply_all(void);
 void ui_lang_apply_bee_state(void);
