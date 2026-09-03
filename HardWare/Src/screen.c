@@ -55,6 +55,7 @@ static uint8_t battery_percent_valid = 0;
 static uint32_t software_version = 20241226UL;
 static uint8_t screen_start_ack = 0;
 static volatile uint8_t startup_language_received = 0U;
+static volatile uint8_t startup_language_preload_enabled = 1U;
 
 #define SCREEN_FAULT_STATUS_ID       0x2F01U
 #define SCREEN_FAULT_REPORT_TIMEOUT  5000U
@@ -186,7 +187,7 @@ void screen_treatment_ack_tick(void)
 void screen_preload_language_from_uart(const uint8_t *data, uint16_t size) {
   const uint16_t frame_size = (uint16_t)sizeof(prepare_data);
 
-  if (data == NULL || size < frame_size) {
+  if (!startup_language_preload_enabled || data == NULL || size < frame_size) {
     return;
   }
 
@@ -213,6 +214,10 @@ void screen_preload_language_from_uart(const uint8_t *data, uint16_t size) {
       startup_language_received = 1U;
     }
   }
+}
+
+void screen_finish_startup_language_preload(void) {
+  startup_language_preload_enabled = 0U;
 }
 
 void screen_fault_popup_tick(void) {
@@ -788,9 +793,9 @@ void processData_prepare(prepare_data_p msg) {
     ui_lang_apply_bee_state();
     break;
   case 0x00AB: // language
-    /* The early UART callback already uses this frame to select the language
-     * before ui_init(). It remains in the queue and is parsed again later, so
-     * only redraw the UI when the language actually changes. */
+    /* A startup frame may already have preselected the language before
+     * ui_init(). Runtime frames reach here without ISR-side UI state changes,
+     * so a changed value refreshes the current page immediately. */
     if ((data <= 1U) && (ui_lang_get() != data)) {
       ui_lang_set(data);
       screen_refresh_runtime_ui();

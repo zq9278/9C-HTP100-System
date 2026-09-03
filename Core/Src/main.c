@@ -159,6 +159,7 @@ int main(void)
   lv_init();
   lv_port_disp_init();
   lv_port_indev_init();
+  screen_finish_startup_language_preload();
   ui_init();
   //HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);//start PWM for Beep
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);

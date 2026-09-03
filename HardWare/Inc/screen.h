@@ -56,6 +56,7 @@ uint16_t Calculate_CRC(uint8_t *data, uint16_t length); // 计算CRC校验值
 size_t ScreenUart_Read(uint8_t *destination, size_t capacity);
 void Serial_data_stream_parsing(const uint8_t *data, size_t length);
 void screen_preload_language_from_uart(const uint8_t *data, uint16_t size);
+void screen_finish_startup_language_preload(void);
 void command_parsing(const uint8_t *received_data);
 void processData(PCTRL_MSG msg);
 void processData_u32(PCTRL_MSG_U32 msg);

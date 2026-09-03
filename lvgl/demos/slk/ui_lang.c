@@ -215,6 +215,55 @@ static void suppress_textarea_cursor(lv_obj_t *obj)
     lv_obj_clear_state(obj, LV_STATE_FOCUSED);
     lv_obj_clear_state(obj, LV_STATE_FOCUS_KEY);
     lv_obj_clear_state(obj, LV_STATE_EDITED);
+    /* SquareLine uses textareas as static titles and button captions. The
+     * default LVGL theme draws a cursor for the focused state, so suppress the
+     * cursor part itself in addition to preventing click focus. */
+    lv_obj_set_style_opa(obj, LV_OPA_TRANSP, LV_PART_CURSOR);
+    lv_obj_set_style_opa(obj, LV_OPA_TRANSP,
+                         LV_PART_CURSOR | LV_STATE_FOCUSED);
+}
+
+static void suppress_static_textarea_tree(lv_obj_t *obj)
+{
+    uint32_t child_count;
+
+    if(obj == NULL) return;
+    if(obj != ui_TextArea2 && lv_obj_check_type(obj, &lv_textarea_class)) {
+        suppress_textarea_cursor(obj);
+    }
+
+    child_count = lv_obj_get_child_cnt(obj);
+    for(uint32_t index = 0; index < child_count; ++index) {
+        suppress_static_textarea_tree(lv_obj_get_child(obj, (int32_t)index));
+    }
+}
+
+static void suppress_all_static_textarea_cursors(void)
+{
+    lv_obj_t *screens[] = {
+        ui_Power_on_interface,
+        ui_home_page,
+        ui_hot_count,
+        ui_hotting,
+        ui_pulsation_set,
+        ui_auto_count,
+        ui_pulsationning,
+        ui_autoing,
+        ui_pulsation_set1,
+        ui_dev_model,
+        ui_count_model,
+        ui_test,
+        ui_setting,
+        ui_pre_setting,
+        ui_set_value,
+        ui_bee_setting,
+        ui_count,
+        ui_Factorymode
+    };
+
+    for(uint32_t index = 0; index < sizeof(screens) / sizeof(screens[0]); ++index) {
+        suppress_static_textarea_tree(screens[index]);
+    }
 }
 
 static void apply_setting_interaction_state(void)
@@ -255,6 +304,7 @@ static void apply_common_state(void)
     ui_lang_apply_setting_state();
     apply_setting_interaction_state();
     apply_return_home_interaction_state();
+    suppress_all_static_textarea_cursors();
 }
 
 static void finalize_layout(void)
