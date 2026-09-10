@@ -32,7 +32,9 @@ void SDRAM_Initialization_Sequence(SDRAM_HandleTypeDef *hsdram, FMC_SDRAM_Comman
   Command->AutoRefreshNumber = 1;
   Command->ModeRegisterDefinition = 0;
 
-  HAL_SDRAM_SendCommand(hsdram, Command, SDRAM_TIMEOUT); // ·¢ËÍ¿ØÖÆÖ¸Áî
+  if (HAL_SDRAM_SendCommand(hsdram, Command, SDRAM_TIMEOUT) != HAL_OK) {
+    Error_Handler(); /* IWDG resets; do not render into uninitialized SDRAM. */
+  } // ·¢ËÍ¿ØÖÆÖ¸Áî
   HAL_Delay(1);                                          // ÑÓÊ±µÈ´ý
 
   /* Configure a PALL (precharge all) command */
@@ -41,7 +43,9 @@ void SDRAM_Initialization_Sequence(SDRAM_HandleTypeDef *hsdram, FMC_SDRAM_Comman
   Command->AutoRefreshNumber = 1;
   Command->ModeRegisterDefinition = 0;
 
-  HAL_SDRAM_SendCommand(hsdram, Command, SDRAM_TIMEOUT); // ·¢ËÍ¿ØÖÆÖ¸Áî
+  if (HAL_SDRAM_SendCommand(hsdram, Command, SDRAM_TIMEOUT) != HAL_OK) {
+    Error_Handler(); /* IWDG resets; do not render into uninitialized SDRAM. */
+  } // ·¢ËÍ¿ØÖÆÖ¸Áî
 
   /* Configure a Auto-Refresh command */
   Command->CommandMode = FMC_SDRAM_CMD_AUTOREFRESH_MODE; // Ê¹ÓÃ×Ô¶¯Ë¢ÐÂ
@@ -49,7 +53,9 @@ void SDRAM_Initialization_Sequence(SDRAM_HandleTypeDef *hsdram, FMC_SDRAM_Comman
   Command->AutoRefreshNumber = 8;                        // ×Ô¶¯Ë¢ÐÂ´ÎÊý
   Command->ModeRegisterDefinition = 0;
 
-  HAL_SDRAM_SendCommand(hsdram, Command, SDRAM_TIMEOUT); // ·¢ËÍ¿ØÖÆÖ¸Áî
+  if (HAL_SDRAM_SendCommand(hsdram, Command, SDRAM_TIMEOUT) != HAL_OK) {
+    Error_Handler(); /* IWDG resets; do not render into uninitialized SDRAM. */
+  } // ·¢ËÍ¿ØÖÆÖ¸Áî
 
   /* Program the external memory mode register */
   tmpmrd = (uint32_t)SDRAM_MODEREG_BURST_LENGTH_2 |
@@ -63,9 +69,13 @@ void SDRAM_Initialization_Sequence(SDRAM_HandleTypeDef *hsdram, FMC_SDRAM_Comman
   Command->AutoRefreshNumber = 1;
   Command->ModeRegisterDefinition = tmpmrd;
 
-  HAL_SDRAM_SendCommand(hsdram, Command, SDRAM_TIMEOUT); // ·¢ËÍ¿ØÖÆÖ¸Áî
+  if (HAL_SDRAM_SendCommand(hsdram, Command, SDRAM_TIMEOUT) != HAL_OK) {
+    Error_Handler(); /* IWDG resets; do not render into uninitialized SDRAM. */
+  } // ·¢ËÍ¿ØÖÆÖ¸Áî
 
-  HAL_SDRAM_ProgramRefreshRate(hsdram, 918); // ÅäÖÃË¢ÐÂÂÊ
+  if (HAL_SDRAM_ProgramRefreshRate(hsdram, 918) != HAL_OK) {
+    Error_Handler();
+  } // ÅäÖÃË¢ÐÂÂÊ
 }
 FMC_SDRAM_CommandTypeDef command;
 /* USER CODE END 0 */

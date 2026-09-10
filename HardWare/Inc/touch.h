@@ -109,13 +109,16 @@ extern Touch_Struct	User_Touch;
 
 
 /*外部函数�?*/
-void GT911_WriteReg(uint16_t _usRegAddr, uint8_t *_pRegBuf, uint8_t _ucLen);
-void GT911_ReadReg(uint16_t _usRegAddr, uint8_t *_pRegBuf, uint8_t _ucLen);
+HAL_StatusTypeDef GT911_WriteReg(uint16_t _usRegAddr, uint8_t *_pRegBuf, uint8_t _ucLen);
+HAL_StatusTypeDef GT911_ReadReg(uint16_t _usRegAddr, uint8_t *_pRegBuf, uint8_t _ucLen);
 
 void GT911_Send_Config(uint8_t mode);		//配置初�?�化ft911
 void Software_Reset(uint8_t gt_SR_type);//复位或者不复位gt911
 void gt911_Scanf(void);									//�?描触摸模�?
 void GT911_Init(void);
+void GT911_RequestScan(void);
+void GT911_RequestRecovery(void);
+void GT911_Process(void);
 int GT911_SetInterruptMode(uint8_t mode);
 //static bool debounce_touch_state(void);
 

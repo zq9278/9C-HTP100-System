@@ -253,7 +253,8 @@ void screen_fault_popup_tick(void) {
   }
 
   if (wanted == SCREEN_POPUP_NONE) {
-    if (global_panel != NULL) {
+    if (global_panel != NULL &&
+        !lv_obj_has_flag(global_panel, LV_OBJ_FLAG_HIDDEN)) {
       lv_obj_add_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
     }
     displayed_popup = SCREEN_POPUP_NONE;
@@ -296,7 +297,9 @@ void screen_fault_popup_tick(void) {
 
   /* The Return Home button may hide the panel. Reassert it while the
    * corresponding condition is still active. */
-  lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
+  if (lv_obj_has_flag(global_panel, LV_OBJ_FLAG_HIDDEN)) {
+    lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
+  }
 }
 
 typedef struct {
@@ -442,7 +445,13 @@ void screen_refresh_runtime_ui(void) {
   }
 
   if (ui_Slider1 != NULL) lv_slider_set_value(ui_Slider1, battery_percent, LV_ANIM_ON);
-  if (ui_Label5 != NULL) lv_label_set_text_fmt(ui_Label5, "%d%%", (int)battery_percent);
+  if (ui_Label5 != NULL) {
+    char text[8];
+    snprintf(text, sizeof(text), "%u%%", (unsigned)battery_percent);
+    if (strcmp(lv_label_get_text(ui_Label5), text) != 0) {
+      lv_label_set_text(ui_Label5, text);
+    }
+  }
   if (ui_Slider2 != NULL) lv_slider_set_value(ui_Slider2, battery_percent, LV_ANIM_ON);
   if (ui_Slider3 != NULL) lv_slider_set_value(ui_Slider3, battery_percent, LV_ANIM_ON);
   if (ui_Slider9 != NULL) lv_slider_set_value(ui_Slider9, battery_percent, LV_ANIM_ON);

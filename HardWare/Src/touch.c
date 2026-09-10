@@ -12,6 +12,12 @@
 
 #include "touch.h"
 #include "tim.h"
+#include <string.h>
+
+#define TOUCH_IO_TIMEOUT_MS 20U
+static volatile uint8_t touch_scan_pending;
+static volatile uint8_t touch_recovery_pending;
+volatile uint32_t touch_io_error_count;
 
 extern I2C_HandleTypeDef hi2c4;
 
@@ -182,16 +188,57 @@ HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 }
 
 
-void GT911_WriteReg(uint16_t _usRegAddr, uint8_t *_pRegBuf, uint8_t _ucLen)
+static HAL_StatusTypeDef touch_io_result(HAL_StatusTypeDef status)
 {
-	HAL_I2C_Mem_Write(&hi2c4, GT911_DIV_W, _usRegAddr, I2C_MEMADD_SIZE_16BIT, _pRegBuf, _ucLen, HAL_MAX_DELAY);
-	// HAL_I2C_Mem_Write_DMA(&hi2c1, GT911_DIV_W, _usRegAddr, I2C_MEMADD_SIZE_16BIT, _pRegBuf, _ucLen);
+    if (status != HAL_OK) {
+        touch_io_error_count++;
+        touch_recovery_pending = 1U;
+    }
+    return status;
 }
 
-void GT911_ReadReg(uint16_t _usRegAddr, uint8_t *_pRegBuf, uint8_t _ucLen)
+HAL_StatusTypeDef GT911_WriteReg(uint16_t reg, uint8_t *buffer, uint8_t size)
 {
-	HAL_I2C_Mem_Read(&hi2c4, GT911_DIV_R, _usRegAddr, I2C_MEMADD_SIZE_16BIT, _pRegBuf, _ucLen, HAL_MAX_DELAY);
-	// HAL_I2C_Mem_Read_DMA(&hi2c1, GT911_DIV_W, _usRegAddr, I2C_MEMADD_SIZE_16BIT, _pRegBuf, _ucLen);
+    return touch_io_result(HAL_I2C_Mem_Write(&hi2c4, GT911_DIV_W, reg,
+                             I2C_MEMADD_SIZE_16BIT, buffer, size, TOUCH_IO_TIMEOUT_MS));
+}
+
+HAL_StatusTypeDef GT911_ReadReg(uint16_t reg, uint8_t *buffer, uint8_t size)
+{
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(&hi2c4, GT911_DIV_R, reg,
+                             I2C_MEMADD_SIZE_16BIT, buffer, size, TOUCH_IO_TIMEOUT_MS);
+    if (status != HAL_OK) memset(buffer, 0, size);
+    return touch_io_result(status);
+}
+
+void GT911_RequestScan(void) { touch_scan_pending = 1U; }
+void GT911_RequestRecovery(void) { touch_recovery_pending = 1U; }
+
+/* Main-loop only: keep blocking I2C and recovery out of EXTI callbacks. */
+void GT911_Process(void)
+{
+    static uint32_t last_poll;
+    static uint32_t last_recovery;
+    uint32_t now = HAL_GetTick();
+    if (touch_recovery_pending) {
+        User_Touch.Touch_State = 0;
+        User_Touch.Touch_Number = 0;
+        if (now - last_recovery < 1000U) return;
+        last_recovery = now;
+        touch_recovery_pending = 0U;
+        /* Reinitialize the actual touch bus (I2C4, not I2C1). */
+        if (HAL_I2C_DeInit(&hi2c4) != HAL_OK || HAL_I2C_Init(&hi2c4) != HAL_OK) {
+            touch_recovery_pending = 1U;
+            return;
+        }
+        GT911_Init();
+        if (touch_recovery_pending) return;
+    }
+    /* Poll as a fallback for edges missed during startup or noise. */
+    if (!touch_scan_pending && now - last_poll < 50U) return;
+    touch_scan_pending = 0U;
+    last_poll = now;
+    gt911_Scanf();
 }
 
 /**
@@ -245,41 +292,31 @@ void Software_Reset(uint8_t gt_SR_type)
  */
 
 
-void gt911_Scanf(void) {
-    uint8_t _temp = 0;
-    GT911_ReadReg(GT_GSTID_REG, &Touch_state, 1); // 读取 0x814E 触摸状态寄存器
-
-    User_Touch.Touch_Number = (Touch_state & 0x0F); // 低 4 位表示触摸点数量
-
-    if ((User_Touch.Touch_Number >= 1) && (User_Touch.Touch_Number <= 5)) {
-        for (uint8_t i = 0; i < User_Touch.Touch_Number; i++) {
-            // 读取 X 坐标
-            GT911_ReadReg(GT_TPD_Sta + i * 8 + X_L, &_temp, 1);
-            User_Touch.Touch_XY[i].X_Point = _temp;
-            GT911_ReadReg(GT_TPD_Sta + i * 8 + X_H, &_temp, 1);
-            User_Touch.Touch_XY[i].X_Point |= (_temp << 8);
-
-            // 读取 Y 坐标
-            GT911_ReadReg(GT_TPD_Sta + i * 8 + Y_L, &_temp, 1);
-            User_Touch.Touch_XY[i].Y_Point = _temp;
-            GT911_ReadReg(GT_TPD_Sta + i * 8 + Y_H, &_temp, 1);
-            User_Touch.Touch_XY[i].Y_Point |= (_temp << 8);
-
-            // 读取触摸压力/尺寸
-            GT911_ReadReg(GT_TPD_Sta + i * 8 + S_L, &_temp, 1);
-            User_Touch.Touch_XY[i].S_Point = _temp;
-            GT911_ReadReg(GT_TPD_Sta + i * 8 + S_H, &_temp, 1);
-            User_Touch.Touch_XY[i].S_Point |= (_temp << 8);
-        }
-
-        // 设置触摸标志
-        User_Touch.Touch_State = 1;
-    } else {
-        // 没有触摸
-        User_Touch.Touch_State = 0;
+void gt911_Scanf(void)
+{
+    uint8_t status;
+    uint8_t clear = 0;
+    uint8_t points[40];
+    if (GT911_ReadReg(GT_GSTID_REG, &status, 1) != HAL_OK) goto failed;
+    /* Keep a held touch if the controller has no new sample yet. */
+    if ((status & 0x80U) == 0U) return;
+    uint8_t count = status & 0x0FU;
+    if (count > 5U) goto failed;
+    if (count != 0U &&
+        GT911_ReadReg(GT_TPD_Sta, points, count * 8U) != HAL_OK) goto failed;
+    if (GT911_WriteReg(GT_GSTID_REG, &clear, 1) != HAL_OK) goto failed;
+    for (uint8_t i = 0U; i < count; ++i) {
+        const uint8_t *p = &points[i * 8U];
+        User_Touch.Touch_XY[i].X_Point = p[X_L] | ((uint16_t)p[X_H] << 8);
+        User_Touch.Touch_XY[i].Y_Point = p[Y_L] | ((uint16_t)p[Y_H] << 8);
+        User_Touch.Touch_XY[i].S_Point = p[S_L] | ((uint16_t)p[S_H] << 8);
     }
-
-    // 清除触摸状态，避免重复触发
-    _temp = 0;
-    GT911_WriteReg(GT_GSTID_REG, &_temp, 1); // 清除寄存器 0x814E
+    Touch_state = status;
+    User_Touch.Touch_Number = count;
+    User_Touch.Touch_State = count != 0U;
+    return;
+failed:
+    User_Touch.Touch_Number = 0;
+    User_Touch.Touch_State = 0;
+    touch_recovery_pending = 1U;
 }

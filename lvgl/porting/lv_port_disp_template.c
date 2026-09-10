@@ -225,15 +225,20 @@ void LCD_CopyBuffer(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uin
  extern LTDC_HandleTypeDef hltdc;
 static void disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
-// SCB_CleanInvalidateDCache();
-// LCD_CopyBuffer(area->x1, area->y1, area->x2 - area->x1+1, area->y2 - area->y1 +1,(uint32_t*)color_p);
-
-// while (wTransferState== 0){}
-        wTransferState = 0;
-        __HAL_LTDC_LAYER(&hltdc, 0)->CFBAR =(uint32_t)color_p;
-        __HAL_LTDC_RELOAD_IMMEDIATE_CONFIG(&hltdc); 
-
-  lv_disp_flush_ready(disp_drv);
+    (void)area;
+    /* full_refresh supplies one complete, 32-byte-aligned RGB565 frame.
+     * Publish CPU writes before LTDC reads SDRAM. DMA2D output has already
+     * been invalidated when its transfer finished; do not clean stale data. */
+    SCB_CleanDCache_by_Addr((uint32_t *)color_p,
+                          MY_DISP_HOR_RES * MY_DISP_VER_RES * sizeof(lv_color_t));
+    __DSB();
+    __HAL_LTDC_LAYER(&hltdc, 0)->CFBAR = (uint32_t)color_p;
+    /* Do not wait for a display timing event in the UI thread. During an
+     * unstable startup it may not arrive. Keep cache synchronization, but
+     * restore immediate reload until asynchronous buffer ownership is used. */
+    __HAL_LTDC_RELOAD_IMMEDIATE_CONFIG(&hltdc);
+    __DSB();
+    lv_disp_flush_ready(disp_drv);
 
 }
 

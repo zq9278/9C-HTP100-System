@@ -79,6 +79,38 @@ static void MX_NVIC_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/* Kept in internal RAM for debugger inspection after a restart. */
+volatile uint32_t screen_reset_flags;
+volatile uint32_t screen_boot_stage;
+
+static void screen_watchdog_feed(void)
+{
+  IWDG1->KR = 0xAAAAU;
+}
+
+static void screen_watchdog_start(void)
+{
+  screen_reset_flags = RCC->RSR;
+  __HAL_RCC_CLEAR_RESET_FLAGS();
+  /* Register sequence follows STM32H7 IWDG: start forces LSI on. No
+   * dependency on HSE/PLL, SysTick, HAL initialization or external SDRAM.
+   * 256 * (999 + 1) / nominal 32000 Hz = 8 s (LSI tolerance applies). */
+  IWDG1->KR = 0xCCCCU;
+  IWDG1->KR = 0x5555U;
+  IWDG1->PR = 6U;
+  IWDG1->RLR = 999U;
+  /* Do not feed while waiting: IWDG itself resets a failed initialization. */
+  while (IWDG1->SR != 0U) {}
+  IWDG1->WINR = 0xFFFU;
+  while (IWDG1->SR != 0U) {}
+  screen_watchdog_feed();
+}
+
+static void screen_boot_progress(uint32_t stage)
+{
+  screen_boot_stage = stage;
+  screen_watchdog_feed();
+}
 
 /* USER CODE END 0 */
 
@@ -90,6 +122,8 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+  screen_watchdog_start();
+  screen_boot_progress(1U);
 
   /* USER CODE END 1 */
 
@@ -115,6 +149,7 @@ int main(void)
 
   /* Configure the system clock */
   SystemClock_Config();
+  screen_boot_progress(2U);
 
   /* USER CODE BEGIN SysInit */
   HAL_SYSCFG_AnalogSwitchConfig(SYSCFG_SWITCH_PA0, SYSCFG_SWITCH_PA0_CLOSE); // ��������Ϊģ�⿪�أ���ʵ�ֲ�ͬ�Ĺ��ܡ����磬���Խ���������Ϊģ�����롢ģ���������??????���ӵ��ڲ���ģ��ģ�飨?? ADC��DAC �ȣ��ر� PA0 ����
@@ -139,13 +174,15 @@ int main(void)
     __WFI();
   }
 
+  screen_boot_progress(3U);
   MX_TIM7_Init();
   MX_TIM15_Init();
   MX_DMA2D_Init();
+  MX_FMC_Init();
+  screen_boot_progress(4U);
   MX_LTDC_Init();
   MX_TIM14_Init();
   MX_TIM6_Init();
-  MX_FMC_Init();
   MX_SPI1_Init();
   MX_I2C4_Init();
   MX_TIM13_Init();
@@ -154,17 +191,21 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-  LCD_Init();
+  /* LCD reset/init is performed once by lv_port_disp_init(). */
   GT911_Init();
+  screen_boot_progress(5U);
   lv_init();
   lv_port_disp_init();
+  screen_boot_progress(6U);
   lv_port_indev_init();
   screen_finish_startup_language_preload();
   ui_init();
+  screen_boot_progress(7U);
   //HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);//start PWM for Beep
-	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
-__HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
-	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 60);
+  /* Backlight must not depend on an LTDC reload acknowledgement. */
+  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 60);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+  __HAL_TIM_MOE_ENABLE(&htim1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -175,10 +216,6 @@ __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
 
     /* USER CODE BEGIN 3 */
 		HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_14);
-		if(Tim7_flag_1s==1){
-			HAL_GPIO_WritePin(GPIOA,GPIO_PIN_11,GPIO_PIN_SET);//switch of lcd backlight,high level is on
-			
-		}
      //HAL_Delay(90);
 #if 0
         UART_RX_TypeDef *frameData;
@@ -188,10 +225,14 @@ __HAL_TIM_MOE_ENABLE(&htim1); // 非常重要
 #endif
         uint8_t serial_data[128];
         size_t received;
-        while ((received = ScreenUart_Read(serial_data,
-                                           sizeof(serial_data))) != 0U) {
+        /* Bound UART work so a noisy/continuous stream cannot starve UI
+         * progress and watchdog servicing. Remaining bytes stay queued. */
+        for (uint8_t batch = 0U; batch < 4U; ++batch) {
+            received = ScreenUart_Read(serial_data, sizeof(serial_data));
+            if (received == 0U) break;
             Serial_data_stream_parsing(serial_data, received);
         }
+        GT911_Process();
         screen_treatment_ack_tick();
      /* Apply every pending startup setting before LVGL's first draw. */
      lv_timer_handler();
@@ -209,6 +250,9 @@ work_flinsh();
             screenstart();
             last_screenstart_time = HAL_GetTick();
         }
+        /* Only a completed communication/touch/UI loop proves liveness.
+         * Never feed from SysTick, interrupts, or peripheral wait loops. */
+        screen_boot_progress(8U);
 	}
   /* USER CODE END 3 */
 }
