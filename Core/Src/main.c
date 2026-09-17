@@ -180,6 +180,7 @@ int main(void)
   MX_DMA2D_Init();
   MX_FMC_Init();
   screen_boot_progress(4U);
+  lv_port_disp_clear_buffers();
   MX_LTDC_Init();
   MX_TIM14_Init();
   MX_TIM6_Init();
@@ -202,10 +203,10 @@ int main(void)
   ui_init();
   screen_boot_progress(7U);
   //HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);//start PWM for Beep
-  /* Backlight must not depend on an LTDC reload acknowledgement. */
+  /* Keep PA11/TIM1_CH4 dark until the first UI frame is drawn. No wait
+   * for a hardware reload flag: frame submission remains immediate. */
   __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 60);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
-  __HAL_TIM_MOE_ENABLE(&htim1);
+  uint8_t backlight_started = 0U;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -234,10 +235,22 @@ int main(void)
         }
         GT911_Process();
         screen_treatment_ack_tick();
-     /* Apply every pending startup setting before LVGL's first draw. */
-     lv_timer_handler();
+        /* Include startup settings and the shield popup in the first frame. */
         screen_fault_popup_tick();
         screen_refresh_runtime_ui();
+        if (!backlight_started) {
+            lv_obj_invalidate(lv_scr_act());
+            lv_obj_invalidate(lv_layer_top());
+            lv_refr_now(NULL);
+            /* disp_flush has published the rendered pixels. This does not
+             * wait on VSYNC, an interrupt, or an acknowledgement flag. */
+            if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4) != HAL_OK) {
+                Error_Handler();
+            }
+            __HAL_TIM_MOE_ENABLE(&htim1);
+            backlight_started = 1U;
+        }
+        lv_timer_handler();
 		
     HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_15);
 if (HAL_GetTick() - save_picture_time >= 1000) {

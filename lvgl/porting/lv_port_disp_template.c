@@ -12,6 +12,7 @@
 #include "lv_port_disp_template.h"
 
 #include <stdbool.h>
+#include <string.h>
 #include "main.h"
 #define LVGL_MemoryAdd ((uint32_t)0xC0000000)//显存地址
   //static lv_color_t *buf_2_3 = (lv_color_t *)(LVGL_MemoryAdd3);
@@ -60,6 +61,16 @@ static void disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_
 /**********************
  *   GLOBAL FUNCTIONS
  **********************/
+
+/* Boot only: SDRAM must be initialized and LTDC must still be stopped.
+ * Both buffers are outside LVGL's heap (which starts at SDRAM + 4 MiB). */
+void lv_port_disp_clear_buffers(void)
+{
+    const uint32_t bytes = 2U * MY_DISP_HOR_RES * MY_DISP_VER_RES * sizeof(lv_color_t);
+    memset((void *)LVGL_MemoryAdd, 0, bytes);
+    SCB_CleanDCache_by_Addr((uint32_t *)LVGL_MemoryAdd, (int32_t)bytes);
+    __DSB();
+}
 
 void lv_port_disp_init(void)
 {

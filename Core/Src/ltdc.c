@@ -53,7 +53,7 @@ void MX_LTDC_Init(void)
   hltdc.Init.TotalWidth = 522;
   hltdc.Init.TotalHeigh = 687;
   hltdc.Init.Backcolor.Blue = 0;
-  hltdc.Init.Backcolor.Green = 255;
+  hltdc.Init.Backcolor.Green = 0;
   hltdc.Init.Backcolor.Red = 0;
   if (HAL_LTDC_Init(&hltdc) != HAL_OK)
   {

@@ -35,6 +35,8 @@ extern "C" {
  **********************/
 /* Initialize low level display driver */
 void lv_port_disp_init(void);
+/* Call after SDRAM initialization, before enabling LTDC. */
+void lv_port_disp_clear_buffers(void);
 
 /* Enable updating the screen (the flushing process) when disp_flush() is called by LVGL
  */
