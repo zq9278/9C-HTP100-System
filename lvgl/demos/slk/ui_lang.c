@@ -290,7 +290,7 @@ void ui_lang_apply_invalid_shield_popup_state(void)
 
     if(ui_lang_get() == UI_LANG_EN) {
         set_textarea(&ui_TextArea30, "Shield invalid\nReplace shield", INT16_MIN, -8, 270, 76, font30);
-        set_textarea_ex(&ui_TextArea39, "Back to Home", INT16_MIN, 2, 250, 44, font30, 1);
+        set_textarea_ex(&ui_TextArea39, "Return to home", INT16_MIN, 2, 250, 44, font30, 1);
     } else {
         restore_textarea(&ui_TextArea30, "检测眼盾无效\n请更换眼盾");
         restore_textarea(&ui_TextArea39, "返回首页");
@@ -407,9 +407,9 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea29, "Setting 1", INT16_MIN, INT16_MIN, 105, 30, small);
     ui_lang_apply_invalid_shield_popup_state();
 
-    set_textarea(&ui_TextArea43, "Prepare", INT16_MIN, INT16_MIN, 170, 56, font30);
-    set_textarea(&ui_TextArea46, "Prepare", INT16_MIN, INT16_MIN, 170, 56, font30);
-    set_textarea(&ui_TextArea54, "Prepare", INT16_MIN, INT16_MIN, 170, 56, font30);
+    set_textarea(&ui_TextArea43, "Ready", INT16_MIN, INT16_MIN, 170, 56, font30);
+    set_textarea(&ui_TextArea46, "Ready", INT16_MIN, INT16_MIN, 170, 56, font30);
+    set_textarea(&ui_TextArea54, "Ready", INT16_MIN, INT16_MIN, 170, 56, font30);
     set_textarea(&ui_TextArea55, "Next step", INT16_MIN, INT16_MIN, 180, 56, font30);
 
     set_textarea(&ui_TextArea34, "Heating", INT16_MIN, INT16_MIN, 150, 34, mid);
@@ -417,10 +417,10 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea51, "Countdown", INT16_MIN, INT16_MIN, 153, 32, mid);
     set_textarea(&ui_TextArea44, "Start", INT16_MIN, INT16_MIN, 145, 58, font40);
     set_bounds(&ui_Container25, INT16_MIN, INT16_MIN, 250, 74);
-    set_textarea_ex(&ui_TextArea56, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea56, "Return to home", INT16_MIN, 5, 250, 54, font30, 1);
     set_textarea_ex(&ui_TextArea18, "Manual treatment stopped", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
     set_bounds(&ui_Container29, INT16_MIN, INT16_MIN, 250, 74);
-    set_textarea_ex(&ui_TextArea57, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea57, "Return to home", INT16_MIN, 5, 250, 54, font30, 1);
     set_textarea_ex(&ui_TextArea19, "Manual treatment completed", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
 
     set_textarea(&ui_TextArea35, "Compressing", INT16_MIN, INT16_MIN, 210, 34, mid);
@@ -428,11 +428,11 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea48, "Stop", INT16_MIN, INT16_MIN, 125, 52, font30);
     set_textarea(&ui_TextArea47, "Start", INT16_MIN, INT16_MIN, 145, 58, font40);
     set_bounds(&ui_Container28, INT16_MIN, INT16_MIN, 250, 74);
-    set_textarea_ex(&ui_TextArea58, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea58, "Return to home", INT16_MIN, 5, 250, 54, font30, 1);
     set_textarea_ex(&ui_TextArea20, "Compression stopped", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
     set_textarea_ex(&ui_TextArea21, "Compression completed", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
     set_bounds(&ui_Container34, INT16_MIN, INT16_MIN, 250, 74);
-    set_textarea_ex(&ui_TextArea62, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea62, "Return to home", INT16_MIN, 5, 250, 54, font30, 1);
 
     set_textarea(&ui_TextArea36, "Quick\nTreatment", INT16_MIN, INT16_MIN, 150, 46, small);
     set_textarea(&ui_TextArea53, "Countdown", INT16_MIN, INT16_MIN, 153, 32, mid);
@@ -441,10 +441,10 @@ static void apply_en_texts(void)
     set_label(&ui_Label40, "Pressure:", INT16_MIN, INT16_MIN, 130, mid);
     set_label(&ui_Label34, "Temperature:", INT16_MIN, INT16_MIN, 155, mid);
     set_bounds(&ui_Container30, INT16_MIN, INT16_MIN, 250, 74);
-    set_textarea_ex(&ui_TextArea60, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea60, "Return to home", INT16_MIN, 5, 250, 54, font30, 1);
     set_textarea_ex(&ui_TextArea23, "Auto treatment stopped", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
     set_bounds(&ui_Container32, INT16_MIN, INT16_MIN, 250, 74);
-    set_textarea_ex(&ui_TextArea61, "Back to Home", INT16_MIN, 5, 250, 54, font30, 1);
+    set_textarea_ex(&ui_TextArea61, "Return to home", INT16_MIN, 5, 250, 54, font30, 1);
     set_textarea_ex(&ui_TextArea22, "Auto treatment completed", INT16_MIN, INT16_MIN, 450, 58, font30, 1);
 
     set_textarea(&ui_TextArea16, "Shield Usage Count", INT16_MIN, INT16_MIN, 320, 58, font30);
@@ -453,13 +453,13 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea26, "Compression Treatment Count:", 0, INT16_MIN, 360, 38, mid);
     set_textarea(&ui_TextArea27, "Quick Treatment Count:", 0, INT16_MIN, 360, 38, mid);
     set_textarea(&ui_TextArea28, "Shield Usage Count", INT16_MIN, INT16_MIN, 360, 58, font30);
-    set_textarea(&ui_TextArea24, "Back to Home", INT16_MIN, INT16_MIN, 280, 50, font30);
+    set_textarea(&ui_TextArea24, "Return to home", INT16_MIN, INT16_MIN, 280, 50, font30);
 
     set_textarea(&ui_TextArea1, "Parameter Setting", INT16_MIN, INT16_MIN, 280, 54, font30);
     set_textarea(&ui_TextArea3, "System Setting", INT16_MIN, INT16_MIN, 250, 54, font30);
-    set_textarea(&ui_TextArea37, "Version: V1", INT16_MIN, INT16_MIN, 170, 26, small);
-    set_textarea(&ui_TextArea38, "Software Ver: V1.0.2.", -18, INT16_MIN, 200, 26, small);
-    set_textarea_ex(&ui_TextArea42, "20241226", 90, 281, 140, 26, small, 1);
+    set_textarea_ex(&ui_TextArea37, "Version: V1", 0, 236, 260, 26, small, 1);
+    set_textarea_ex(&ui_TextArea38, "Software Ver: V1.0.2.", 0, 264, 260, 26, small, 1);
+    set_textarea_ex(&ui_TextArea42, "20241226", 0, 302, 260, 26, small, 1);
     set_textarea(&ui_TextArea13, "Preset 1", INT16_MIN, INT16_MIN, 220, 58, font40);
     set_textarea(&ui_TextArea15, "Preset 2", INT16_MIN, INT16_MIN, 220, 58, font40);
     set_textarea(&ui_TextArea14, "Preset 3", INT16_MIN, INT16_MIN, 220, 58, font40);

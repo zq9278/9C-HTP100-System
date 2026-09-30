@@ -273,7 +273,7 @@ void screen_fault_popup_tick(void) {
                                "Shield invalid\nReplace shield" :
                                "检测眼盾无效\n请更换眼盾",
                                ui_lang_get() == UI_LANG_EN ?
-                               "Back to Home" : "返回首页");
+                               "Return to home" : "返回首页");
     } else if (wanted == SCREEN_POPUP_FAULT) {
       if (ui_lang_get() == UI_LANG_EN) {
         snprintf(text, sizeof(text), "Fault code: 0x%04lX",
@@ -283,12 +283,12 @@ void screen_fault_popup_tick(void) {
                  (unsigned long)active_fault_code);
       }
       global_panel_set_content(text, ui_lang_get() == UI_LANG_EN ?
-                               "Back to Home" : "返回首页");
+                               "Return to home" : "返回首页");
     } else {
       global_panel_set_content(ui_lang_get() == UI_LANG_EN ?
                                "Communication failed" : "通讯失败",
                                ui_lang_get() == UI_LANG_EN ?
-                               "Back to Home" : "返回首页");
+                               "Return to home" : "返回首页");
     }
     displayed_popup = wanted;
     displayed_fault_code = active_fault_code;

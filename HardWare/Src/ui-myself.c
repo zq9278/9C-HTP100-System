@@ -107,7 +107,7 @@ void global_panel_set_content(const char *message, const char *button_text) {
     }
     if (global_popup_button_text != NULL && button_text != NULL) {
         lv_obj_set_style_text_font(global_popup_button_text,
-                                   strcmp(button_text, "Back to Home") == 0 ?
+                                   strcmp(button_text, "Return to home") == 0 ?
                                    &ui_font_alibaba30 : &ui_font_popup40,
                                    LV_PART_MAIN | LV_STATE_DEFAULT);
         lv_label_set_text(global_popup_button_text, button_text);
