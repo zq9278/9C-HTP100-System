@@ -48,3 +48,31 @@ test('flash uses frozen verified bytes and requires a download completion reply'
     info.sha256='bad';await assert.rejects(p.flash({...base,jlink:tool}),/发生变化/);assert.equal(flashes,2);
   } finally {fs.unlinkSync(source);fs.unlinkSync(tool);fs.rmdirSync(folder);}
 });
+
+test('distribution runs only the bundled tool, needs no Python, and rejects modified firmware/runtime', async () => {
+  const folder=fs.mkdtempSync(path.join(os.tmpdir(),'htp-bundle-'));
+  const digest=value=>crypto.createHash('sha256').update(value).digest('hex');
+  fs.mkdirSync(path.join(folder,'firmware'));fs.mkdirSync(path.join(folder,'jlink'));
+  const firmware=path.join(folder,'firmware/screen-old.hex'), tool=path.join(folder,'jlink/JLink.exe');
+  fs.writeFileSync(firmware,'fixture');fs.writeFileSync(tool,'tool');
+  const info={role:'screen-old',preset:'Release',lcd_panel:'OLD',file:'screen-old.hex',sha256:digest('fixture')};
+  const manifest={images:{'screen-old':info},runtime:{'jlink/JLink.exe':digest('tool')}};
+  fs.writeFileSync(path.join(folder,'bundle.json'),JSON.stringify(manifest));
+  let calls=0;
+  const p=new Programmer({bundleRoot:folder,runner:async(command)=>{
+    calls++;assert.equal(command,tool);return 'Downloading file [firmware.hex]...\nO.K.\n';
+  }});
+  try {
+    assert.equal((await p.inspect(base)).sha256,info.sha256);assert.equal(calls,0);
+    await p.flash({...base,jlink:'ignored.exe'});assert.equal(calls,1);
+    await assert.rejects(p.flash({...base,rebuild:true}),/不能重新编译/);
+    await assert.rejects(p.inspect({...base,preset:'Debug'}),/Release/);
+    await assert.rejects(p.build(base),/不支持编译/);
+    fs.writeFileSync(firmware,'damaged');await assert.rejects(p.flash(base),/固件损坏/);
+    fs.writeFileSync(firmware,'fixture');fs.writeFileSync(tool,'damaged');
+    await assert.rejects(p.flash(base),/J-Link 文件损坏/);assert.equal(calls,1);
+  } finally {
+    for(const file of [firmware,tool,path.join(folder,'bundle.json')])fs.unlinkSync(file);
+    fs.rmdirSync(path.join(folder,'firmware'));fs.rmdirSync(path.join(folder,'jlink'));fs.rmdirSync(folder);
+  }
+});

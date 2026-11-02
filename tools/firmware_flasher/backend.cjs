@@ -57,7 +57,22 @@ function commandArgs(options, script) {
 }
 
 class Programmer {
-  constructor({runner = run, root = ROOT} = {}) {this.runner = runner; this.root = root; this.busy = false;}
+  constructor({runner = run, root = ROOT, bundleRoot = null} = {}) {
+    this.runner = runner; this.root = root; this.bundleRoot = bundleRoot; this.busy = false;
+    this.bundle = bundleRoot ? JSON.parse(fs.readFileSync(path.join(bundleRoot, 'bundle.json'), 'utf8')) : null;
+  }
+  bundledFile(relative) {
+    const file = path.resolve(this.bundleRoot, relative);
+    if (!file.startsWith(path.resolve(this.bundleRoot) + path.sep)) throw Error('无效的软件包路径');
+    return file;
+  }
+  verifyRuntime() {
+    if (!this.bundle) return;
+    if (!this.bundle.runtime || !this.bundle.runtime['jlink/JLink.exe']) throw Error('软件包缺少 J-Link 清单');
+    for (const [file, expected] of Object.entries(this.bundle.runtime)) {
+      if (hash(this.bundledFile(file)) !== expected) throw Error(`J-Link 文件损坏，请重新解压软件包：${file}`);
+    }
+  }
   async exclusive(fn) {
     if (this.busy) throw Error('当前任务尚未完成');
     this.busy = true;
@@ -66,12 +81,22 @@ class Programmer {
   python() {return process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');}
   async inspect(options) {
     validate(options);
+    if (this.bundle) {
+      if (options.preset !== 'Release') throw Error('分发版只提供内置 Release 固件');
+      const info = this.bundle.images[options.role];
+      if (!info || info.role !== options.role || info.preset !== 'Release' || info.file !== options.role + '.hex'
+          || info.lcd_panel !== (options.role === 'main' ? null : options.role.split('-')[1].toUpperCase())) throw Error('内置固件清单与板型不匹配');
+      const file = this.bundledFile('firmware/' + info.file);
+      if (hash(file) !== info.sha256) throw Error('内置固件损坏，请重新解压软件包');
+      return {...info, path: file};
+    }
     const output = await this.runner(this.python(), ['scripts/package_info.py', '--role', options.role, '--preset', options.preset], {cwd: this.root, timeout: 120000});
     const info = JSON.parse(output);
     if (info.role !== options.role || info.preset !== options.preset) throw Error('固件类型不匹配');
     return info;
   }
   async compile(options, log) {
+    if (this.bundle) throw Error('分发版使用内置固件，不支持编译');
     validate(options);
     log(`开始构建：${options.role} / ${options.preset}\n`);
     await this.runner(this.python(), ['scripts/build.py', '--board', options.role, '--preset', options.preset], {cwd: this.root, log});
@@ -81,7 +106,9 @@ class Programmer {
   flash(options, log = () => {}) {
     return this.exclusive(async () => {
       validate(options);
-      const executable = options.jlink || findJLink();
+      if (this.bundle && options.rebuild) throw Error('分发版不能重新编译，请使用内置固件');
+      this.verifyRuntime();
+      const executable = this.bundle ? this.bundledFile('jlink/JLink.exe') : options.jlink || findJLink();
       if (!executable || !fs.existsSync(executable)) throw Error('未找到 J-Link Commander，请安装 SEGGER J-Link 或选择 JLink.exe');
       const info = options.rebuild ? await this.compile(options, log) : await this.inspect(options);
       const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'htp-flash-'));
@@ -92,7 +119,7 @@ class Programmer {
         const script = path.join(folder, 'program.jlink'); fs.writeFileSync(script, commandScript(options.role), 'ascii');
         log(`开始下载并校验：${options.role}\nSHA-256 ${info.sha256}\n`);
         const output = await this.runner(executable, commandArgs(options, script), {cwd: folder, log});
-        if (!/Downloading file/i.test(output) || !/O\.K\./i.test(output)) throw Error('未收到完整下载成功回执，请检查 J-Link 日志');
+        if (!/Downloading file[^]*?\bO\.K\./i.test(output) || /(?:^|\n)\s*(?:ERROR\s*[:!]|Cannot connect|Failed to)/i.test(output)) throw Error('未收到完整下载成功回执，请检查 J-Link 日志');
         log('下载及 J-Link 内置校验完成，已请求复位运行。\n');
         return info;
       } finally {

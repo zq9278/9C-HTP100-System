@@ -21,6 +21,7 @@
 - [主屏通信协议](docs/通信协议.md)：状态、确认、超时和重启处理。
 - [调参工具使用](tools/pressure_tuner/README.md)：临时改参及断开恢复。
 - [烧录工具使用](tools/firmware_flasher/README.md)：双击根目录 `start_flasher.cmd`；新旧屏幕都含 BOOT。
+- 分发包：执行 `python scripts/package_flasher.py`，生成自带 J-Link、驱动和三种 Release 固件的 Windows ZIP；接收方解压运行 `HTP100-Flasher.exe`。
 - [屏幕显示修复及验收](docs/屏幕显示与烧录工具.md)：Setting 标签、启动故障背景及新旧 LCD 验证。
 
 ## 构建
@@ -48,7 +49,7 @@ python scripts/test.py
 node --test tools/pressure_tuner/main.test.cjs
 python tools/pressure_tuner/test_bridge.py
 python tests/test_ihex.py
-node --test tools/firmware_flasher/backend.test.cjs
+node --test tools/firmware_flasher/backend.test.cjs tools/firmware_flasher/renderer.test.cjs
 python scripts/test_screen_ui.py
 ```
 

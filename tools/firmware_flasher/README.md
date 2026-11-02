@@ -1,5 +1,25 @@
 # HTP100 固件烧录工具
 
+## 分发版（接收方使用）
+
+`out/distribution/` 中的 ZIP 包含独立 Windows x64 应用、J-Link 程序及 USB 驱动、主机/新 LCD/旧 LCD 三种 Release 固件。完整解压后双击 `HTP100-Flasher.exe`，不需要安装 Node.js、Python 或编译器，也不依赖原工程目录。
+
+分发版只烧录内置固件，选择板型后点击“开始烧录”。首次没有驱动时点击“安装 J-Link 驱动”，按 Windows 提示完成安装。窗口固定为 1040×780 内容区域，禁止调整大小/最大化；屏幕可用空间不足时保持比例整体缩小。
+
+成功后显示绿色“烧录成功”弹窗（含板型、时间）并保留绿色状态；失败显示错误和日志，不弹成功提示。固件和 J-Link 运行文件在烧录前校验 SHA-256，文件损坏会阻止下载。
+
+在开发电脑重新生成分发包：
+
+```powershell
+python scripts/package_flasher.py
+```
+
+默认先重新构建三种 Release 固件；`--skip-build` 仅打包已验证的现有 Release 文件。可以用 `--jlink "C:/Program Files/SEGGER/JLink_V954"` 指定运行组件目录。打包过程不连接硬件。ZIP 旁生成 `.sha256` 文件。
+
+J-Link 原许可随包保留；对外分发条件见 [分发说明](DISTRIBUTION.md) 与随包 `SEGGER-LICENSE.txt`。本工具未替代第三方分发授权。
+
+## 开发版（本机使用）
+
 在联合仓库双击 `start_flasher.cmd`，或本目录 `start.cmd`。首次启动会安装 Electron 依赖。需要 Node.js/npm、Python 3.10+、CMake、Ninja、Arm GNU 工具链和 SEGGER J-Link；当前电脑已安装并完成软件测试。
 
 ## 使用
