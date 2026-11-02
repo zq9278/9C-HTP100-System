@@ -26,7 +26,7 @@ const volatile uint32_t g_pressure_jlink_tuning_enabled = PRESSURE_JLINK_TUNING_
 
 /* Used whenever external storage is blank, corrupt or has another version. */
 
-// 速度为驱动器速度指令值；保压速度还受内部3000上限约束，实际上限=min(表中值,3000)。
+// 速度为驱动器速度指令值；保压阶段的 P 控制输出限制在 ±60000。
 // ??????(mV/V)?????(mmHg)????????????????????Kp????????
 // ???????????0.3????????????30%??????
 static const PressureTuningProfile g_defaults[PRESSURE_TUNING_PROFILE_COUNT] = {
@@ -39,11 +39,11 @@ static const PressureTuningProfile g_defaults[PRESSURE_TUNING_PROFILE_COUNT] = {
     // {0.370f, 0.0f, 45000.0f,        9000.0f,            30000.0f,   150.0f},
     // {0.370f, 0.0f, 45000.0f,        9000.0f,            30000.0f,   100.0f}
 
-    { 20000.0f,  40000.0f,   30.0f, 0.9f},
-    { 40000.0f,  65000.0f,   1.0f,  0.5f},
-    { 40000.0f,  65000.0f,   1.0f,  0.8f},
-    { 45000.0f,  65000.0f,   1.0f,  0.8f},
-    { 45000.0f,  65000.0f,   1.0f,  0.9f}
+    { 20000.0f,  40000.0f,   100.0f, 0.9f},
+    { 20000.0f,  60000.0f,   200.0f,  0.9f},
+    { 40000.0f,  60000.0f,   100.0f,  0.9f},
+    { 45000.0f,  65000.0f,   50.0f,  0.9f},
+    { 45000.0f,  65000.0f,   50.0f,  0.9f}
 };
 
 static PressureTuningProfile g_profiles[PRESSURE_TUNING_PROFILE_COUNT];

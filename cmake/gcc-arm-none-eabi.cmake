@@ -35,18 +35,14 @@ find_program(ARM_NONE_EABI_GXX ${TOOLCHAIN_PREFIX}g++ HINTS ${STM32CUBE_TOOLCHAI
 find_program(ARM_NONE_EABI_OBJCOPY ${TOOLCHAIN_PREFIX}objcopy HINTS ${STM32CUBE_TOOLCHAIN_BINS} NO_DEFAULT_PATH)
 find_program(ARM_NONE_EABI_SIZE ${TOOLCHAIN_PREFIX}size HINTS ${STM32CUBE_TOOLCHAIN_BINS} NO_DEFAULT_PATH)
 
-if(NOT ARM_NONE_EABI_GCC OR NOT ARM_NONE_EABI_GXX OR NOT ARM_NONE_EABI_OBJCOPY OR NOT ARM_NONE_EABI_SIZE)
-    message(FATAL_ERROR
-        "arm-none-eabi toolchain not found. Set PATH or STM32CUBE_BUNDLE_PATH/CUBE_BUNDLE_PATH "
-        "to your STM32Cube bundles directory."
-    )
-endif()
+# Fall back to tools installed on PATH (for example via Homebrew or Arm's installer).
+find_program(ARM_NONE_EABI_GCC ${TOOLCHAIN_PREFIX}gcc)
+find_program(ARM_NONE_EABI_GXX ${TOOLCHAIN_PREFIX}g++)
+find_program(ARM_NONE_EABI_OBJCOPY ${TOOLCHAIN_PREFIX}objcopy)
+find_program(ARM_NONE_EABI_SIZE ${TOOLCHAIN_PREFIX}size)
 
 if(NOT ARM_NONE_EABI_GCC OR NOT ARM_NONE_EABI_GXX OR NOT ARM_NONE_EABI_OBJCOPY OR NOT ARM_NONE_EABI_SIZE)
-    message(FATAL_ERROR
-        "arm-none-eabi toolchain not found. Set PATH or STM32CUBE_BUNDLE_PATH/CUBE_BUNDLE_PATH "
-        "to your STM32Cube bundles directory."
-    )
+    message(FATAL_ERROR "arm-none-eabi toolchain not found. Install it on PATH or set STM32CUBE_BUNDLE_PATH.")
 endif()
 
 set(CMAKE_C_COMPILER                ${ARM_NONE_EABI_GCC})
