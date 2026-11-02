@@ -7,6 +7,7 @@
 *.o
 *.elf
 *.hex
+!firmware/screen/boot/BOOT.hex
 *.bin
 *.map
 *.pyc

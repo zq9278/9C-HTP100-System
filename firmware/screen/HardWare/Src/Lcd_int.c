@@ -83,12 +83,17 @@ void LCD_WriteData(uint8_t data)
     SPI_SendData(data);
     CSB_HIGH(); // 取消LCD激活
 }
-#define new 1
-#define old 0
+#ifndef HTP_LCD_NEW
+#define HTP_LCD_NEW 1
+#endif
+#if HTP_LCD_NEW != 0 && HTP_LCD_NEW != 1
+#error HTP_LCD_NEW must be 0 or 1
+#endif
+const unsigned g_lcd_panel_new = HTP_LCD_NEW;
 // LCD初始化函数`
 void LCD_Init(void)
 {
-	#if old
+	#if !HTP_LCD_NEW
     // 复位LCD
     LCD_RESET_HIGH(); // 复位引脚置高
     HAL_Delay(1);     // 延时5ms
@@ -397,7 +402,7 @@ void LCD_Init(void)
 #endif
    // Vendor-provided init sequence (new panel)
 
-   #if new
+   #if HTP_LCD_NEW
     LCD_RESET_HIGH();
     HAL_Delay(10);
     LCD_RESET_LOW();

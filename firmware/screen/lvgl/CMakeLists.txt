@@ -96,6 +96,7 @@ add_executable(slk_sdl_sim
     ${UI_SOURCES}
     sim/desktop/main.c
     sim/desktop/desktop_shim.c
+    ../HardWare/Src/ui-myself.c
 )
 
 target_compile_definitions(slk_sdl_sim PRIVATE
@@ -107,7 +108,9 @@ target_include_directories(slk_sdl_sim PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/demos/slk
     ${CMAKE_CURRENT_SOURCE_DIR}/sim/desktop/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../HardWare/Inc
 )
+target_compile_options(slk_sdl_sim PRIVATE -UNDEBUG)
 
 target_link_libraries(slk_sdl_sim PRIVATE SDL2::SDL2)
 

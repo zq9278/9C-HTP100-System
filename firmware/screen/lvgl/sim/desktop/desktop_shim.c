@@ -1,6 +1,8 @@
 #include "screen.h"
 #include "stm32h7xx_hal.h"
 #include "ui-myself.h"
+#include "ui.h"
+#include <stdbool.h>
 
 #include <stddef.h>
 #include <time.h>
@@ -21,10 +23,11 @@ uint16_t prepare_time = 5;
 uint16_t bee = 1;
 uint16_t prepare_set = 0;
 
-lv_obj_t *global_panel = NULL;
-
-void screen_refresh_prepare_ui(void) {}
-void screen_refresh_runtime_ui(void) {}
+bool ScreenLink_Healthy(void) { return true; }
+bool ScreenLink_Pending(void) { return false; }
+bool ScreenLink_Request(uint16_t cmd, float value, uint16_t duration) { (void)cmd; (void)value; (void)duration; return true; }
+void screen_refresh_prepare_ui(void) { ui_lang_update_preset_label(prepare_set); }
+void screen_refresh_runtime_ui(void) { screen_refresh_prepare_ui(); }
 void screen_reset_hotting_runtime_ui(void) {}
 void screen_reset_pulsationning_runtime_ui(void) {}
 void screen_reset_autoing_runtime_ui(void) {}

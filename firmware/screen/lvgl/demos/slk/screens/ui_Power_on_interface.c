@@ -9,6 +9,21 @@ lv_obj_t * ui_Power_on_interface = NULL;
 lv_obj_t * ui_Image23 = NULL;
 lv_obj_t * ui_Image7 = NULL;
 lv_obj_t * ui_Image3 = NULL;
+static lv_timer_t *startup_timer;
+
+void ui_startup_finish(void)
+{
+    if (startup_timer != NULL) { lv_timer_del(startup_timer); startup_timer = NULL; }
+    if (ui_Image7 != NULL) lv_anim_del(ui_Image7, NULL);
+    if (lv_scr_act() == ui_Power_on_interface)
+        _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
+}
+
+static void startup_ready(lv_timer_t *timer)
+{
+    (void)timer;
+    ui_startup_finish();
+}
 // event funtions
 void ui_event_Power_on_interface(lv_event_t * e)
 {
@@ -16,7 +31,8 @@ void ui_event_Power_on_interface(lv_event_t * e)
 
     if(event_code == LV_EVENT_SCREEN_LOADED) {
         huaru_Animation(ui_Image7, 0);
-        _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 1500, &ui_home_page_screen_init);
+        if (startup_timer != NULL) lv_timer_del(startup_timer);
+        startup_timer = lv_timer_create(startup_ready, 1500, NULL);
     }
 }
 
@@ -61,6 +77,7 @@ void ui_Power_on_interface_screen_init(void)
 
 void ui_Power_on_interface_screen_destroy(void)
 {
+    if (startup_timer != NULL) { lv_timer_del(startup_timer); startup_timer = NULL; }
     if(ui_Power_on_interface) lv_obj_del(ui_Power_on_interface);
 
     // NULL screen variables

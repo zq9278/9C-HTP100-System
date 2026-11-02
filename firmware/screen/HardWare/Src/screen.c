@@ -153,6 +153,13 @@ void screen_fault_popup_tick(void) {
     return;
   }
 
+  /* Do not overlay a transient splash with a transparent fault mask. A real
+   * startup fault goes straight to the stable home background. No link yet
+   * during the normal splash is expected, not an immediate boot fault. */
+  if (lv_scr_act() == ui_Power_on_interface) {
+    if (wanted == SCREEN_POPUP_HOST_LOST && !eye_state_received) return;
+    ui_startup_finish();
+  }
   create_global_panel();
   if (global_panel == NULL) {
     return;
@@ -294,34 +301,7 @@ static void set_version_text(void) {
 }
 
 void screen_refresh_prepare_ui(void) {
-  const char *target_text;
-  const char *current_text;
-
-  if (ui_TextArea29 == NULL) {
-    return;
-  }
-
-  switch (prepare_set) {
-  case 1:
-    target_text = ui_lang_get() == UI_LANG_EN ? "Setting 1" : "设定一";
-    break;
-  case 2:
-    target_text = ui_lang_get() == UI_LANG_EN ? "Setting 2" : "设定二";
-    break;
-  case 3:
-    target_text = ui_lang_get() == UI_LANG_EN ? "Setting 3" : "设定三";
-    break;
-  default:
-    target_text = ui_lang_get() == UI_LANG_EN ? "Setting 1" : "设定一";
-    break;
-  }
-
-  current_text = lv_textarea_get_text(ui_TextArea29);
-  if (current_text != NULL && strcmp(current_text, target_text) == 0) {
-    return;
-  }
-
-  lv_textarea_set_text(ui_TextArea29, target_text);
+  ui_lang_update_preset_label(prepare_set);
 }
 
 void screen_refresh_runtime_ui(void) {

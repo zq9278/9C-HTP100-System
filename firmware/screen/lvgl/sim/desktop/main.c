@@ -2,6 +2,10 @@
 
 #include "lvgl.h"
 #include "ui.h"
+#include "ui-myself.h"
+#include "screen.h"
+#include <assert.h>
+#include <stdio.h>
 
 #include <SDL.h>
 #include <stdbool.h>
@@ -66,13 +70,14 @@ static int init_sdl(void)
         SDL_WINDOWPOS_CENTERED,
         SIM_HOR_RES,
         SIM_VER_RES,
-        SDL_WINDOW_SHOWN
+        getenv("SLK_HEADLESS") ? SDL_WINDOW_HIDDEN : SDL_WINDOW_SHOWN
     );
     if(window == NULL) {
         return -1;
     }
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (renderer == NULL) renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
     if(renderer == NULL) {
         return -1;
     }
@@ -164,6 +169,37 @@ static void save_framebuffer_bmp(const char *path)
     }
 }
 
+static void test_static_ui(void)
+{
+    ui_lang_set(UI_LANG_EN);
+    assert(lv_scr_act() == ui_Power_on_interface);
+    ui_startup_finish();
+    assert(lv_scr_act() == ui_home_page);
+    for (unsigned preset = 1; preset <= 3; ++preset) {
+        char expected[20]; snprintf(expected, sizeof(expected), "Setting %u", preset);
+        prepare_set = preset;
+        for (unsigned repeat = 0; repeat < 6; ++repeat) {
+            ui_lang_apply_all();
+            assert(strcmp(lv_label_get_text(ui_TextArea29), expected) == 0);
+            _ui_screen_change(&ui_setting, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_setting_screen_init);
+            _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
+            lv_obj_update_layout(ui_home_page);
+            assert(lv_obj_get_width(ui_TextArea29) == 127);
+            assert(lv_obj_get_height(ui_TextArea29) == 43);
+            assert(lv_obj_get_x_aligned(ui_TextArea29) == 3);
+            assert(lv_obj_get_y_aligned(ui_TextArea29) == 1);
+            assert(strcmp(lv_label_get_text(ui_TextArea29), expected) == 0);
+        }
+    }
+    _ui_screen_change(&ui_setting, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_setting_screen_init);
+    lv_tick_inc(1700); lv_timer_handler();
+    assert(lv_scr_act() == ui_setting); /* Cancelled boot timer cannot jump home later. */
+    ui_lang_set(UI_LANG_ZH); ui_lang_set(UI_LANG_EN);
+    assert(strcmp(lv_label_get_text(ui_TextArea29), "Setting 3") == 0);
+    _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
+    puts("PASS: preset label geometry/text, language roundtrip, startup cancellation");
+}
+
 int main(int argc, char **argv)
 {
     uint32_t last_tick;
@@ -194,6 +230,13 @@ int main(int argc, char **argv)
         } else if(strcmp(lang_name, "zh") == 0 || strcmp(lang_name, "ZH") == 0) {
             ui_lang_set(UI_LANG_ZH);
         }
+    }
+    if (getenv("SLK_SELF_TEST")) test_static_ui();
+    if (getenv("SLK_INVALID_SHIELD")) {
+        ui_startup_finish();
+        create_global_panel();
+        global_panel_set_content("Shield invalid\nReplace shield", "Return to home");
+        lv_obj_clear_flag(global_panel, LV_OBJ_FLAG_HIDDEN);
     }
     capture_path = getenv("SLK_CAPTURE_BMP");
     if(capture_path != NULL && capture_path[0] != '\0') {

@@ -6,9 +6,8 @@
             "hidden": true,
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/${presetName}",
-		    "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake",
-            "cacheVariables": {
-            }
+            "toolchainFile": "${sourceDir}/cmake/gcc-arm-none-eabi.cmake",
+            "cacheVariables": {}
         },
         {
             "name": "Debug",
@@ -23,6 +22,34 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "DebugNew",
+            "inherits": "Debug",
+            "cacheVariables": {
+                "HTP_LCD_PANEL": "NEW"
+            }
+        },
+        {
+            "name": "DebugOld",
+            "inherits": "Debug",
+            "cacheVariables": {
+                "HTP_LCD_PANEL": "OLD"
+            }
+        },
+        {
+            "name": "ReleaseNew",
+            "inherits": "Release",
+            "cacheVariables": {
+                "HTP_LCD_PANEL": "NEW"
+            }
+        },
+        {
+            "name": "ReleaseOld",
+            "inherits": "Release",
+            "cacheVariables": {
+                "HTP_LCD_PANEL": "OLD"
+            }
         }
     ],
     "buildPresets": [
@@ -33,6 +60,22 @@
         {
             "name": "Release",
             "configurePreset": "Release"
+        },
+        {
+            "name": "DebugNew",
+            "configurePreset": "DebugNew"
+        },
+        {
+            "name": "DebugOld",
+            "configurePreset": "DebugOld"
+        },
+        {
+            "name": "ReleaseNew",
+            "configurePreset": "ReleaseNew"
+        },
+        {
+            "name": "ReleaseOld",
+            "configurePreset": "ReleaseOld"
         }
     ]
 }

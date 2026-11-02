@@ -306,14 +306,15 @@ void ui_home_page_screen_init(void)
     lv_obj_add_flag(ui_Image24, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
     lv_obj_clear_flag(ui_Image24, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
-    ui_TextArea29 = lv_textarea_create(ui_Image24);
+    /* Static preset caption: no edit cursor, scrolling or width-dependent wrap. */
+    ui_TextArea29 = lv_label_create(ui_Image24);
     lv_obj_set_width(ui_TextArea29, 127);
     lv_obj_set_height(ui_TextArea29, 43);
     lv_obj_set_x(ui_TextArea29, 3);
     lv_obj_set_y(ui_TextArea29, 1);
     lv_obj_set_align(ui_TextArea29, LV_ALIGN_CENTER);
-    lv_textarea_set_text(ui_TextArea29, "设定一");
-    lv_textarea_set_placeholder_text(ui_TextArea29, "Placeholder...");
+    lv_label_set_long_mode(ui_TextArea29, LV_LABEL_LONG_CLIP);
+    lv_label_set_text(ui_TextArea29, "设定一");
     lv_obj_clear_flag(ui_TextArea29, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);      /// Flags
     lv_obj_set_style_text_color(ui_TextArea29, lv_color_hex(0x39BAD5), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_TextArea29, 255, LV_PART_MAIN | LV_STATE_DEFAULT);

@@ -14,3 +14,5 @@ jobs:
       - run: python scripts/test.py
       - run: node --test tools/pressure_tuner/main.test.cjs
       - run: python tools/pressure_tuner/test_bridge.py
+      - run: python tests/test_ihex.py
+      - run: node --test tools/firmware_flasher/backend.test.cjs

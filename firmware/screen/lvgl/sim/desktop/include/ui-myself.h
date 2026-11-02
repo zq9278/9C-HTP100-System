@@ -3,6 +3,9 @@
 
 #include "stm32h7xx_hal.h"
 #include <stdint.h>
+#include "lvgl.h"
+void create_global_panel(void);
+void global_panel_set_content(const char *, const char *);
 
 #define AXI_SRAM
 

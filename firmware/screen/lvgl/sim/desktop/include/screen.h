@@ -8,5 +8,8 @@ extern lv_obj_t *global_panel;
 extern uint8_t EYE_status;
 void screen_refresh_prepare_ui(void);
 void screen_refresh_runtime_ui(void);
+void screen_reset_autoing_runtime_ui(void);
+void screen_reset_hotting_runtime_ui(void);
+void screen_reset_pulsationning_runtime_ui(void);
 
 #endif

@@ -301,6 +301,7 @@ void ui_lang_apply_invalid_shield_popup_state(void)
 
 static void apply_common_state(void)
 {
+    ui_lang_update_preset_label(prepare_set);
     ui_lang_apply_setting_state();
     apply_setting_interaction_state();
     apply_return_home_interaction_state();
@@ -321,7 +322,6 @@ static void apply_zh_texts(void)
     restore_textarea(&ui_TextArea33, "快 速治 疗");
     restore_textarea(&ui_TextArea32, "挤压");
     restore_textarea(&ui_TextArea31, "加热");
-    restore_textarea(&ui_TextArea29, "设定一");
     ui_lang_apply_invalid_shield_popup_state();
 
     restore_textarea(&ui_TextArea43, "准  备");
@@ -404,7 +404,6 @@ static void apply_en_texts(void)
     set_textarea(&ui_TextArea33, "Quick\nTreatment", INT16_MIN, INT16_MIN, 190, 88, font30);
     set_textarea(&ui_TextArea32, "Compress", INT16_MIN, INT16_MIN, 180, 45, font30);
     set_textarea(&ui_TextArea31, "Heat", INT16_MIN, INT16_MIN, 86, 45, font30);
-    set_textarea(&ui_TextArea29, "Setting 1", INT16_MIN, INT16_MIN, 105, 30, small);
     ui_lang_apply_invalid_shield_popup_state();
 
     set_textarea(&ui_TextArea43, "Ready", INT16_MIN, INT16_MIN, 170, 56, font30);
@@ -535,6 +534,24 @@ void ui_lang_apply_setting_state(void)
 {
     ui_lang_apply_bee_state();
     ui_lang_apply_language_state();
+}
+
+void ui_lang_update_preset_label(uint16_t preset)
+{
+    if (ui_TextArea29 == NULL) return;
+    static const char *zh[] = {"设定一", "设定二", "设定三"};
+    static const char *en[] = {"Setting 1", "Setting 2", "Setting 3"};
+    unsigned index = preset >= 1 && preset <= 3 ? preset - 1 : 0;
+    const lv_font_t *font = ui_lang_get() == UI_LANG_EN ? LV_FONT_DEFAULT : &ui_font_alibaba10;
+    const char *text = ui_lang_get() == UI_LANG_EN ? en[index] : zh[index];
+    lv_obj_set_size(ui_TextArea29, 127, 43);
+    lv_obj_set_pos(ui_TextArea29, 3, 1);
+    lv_obj_set_style_text_font(ui_TextArea29, font, 0);
+    lv_obj_set_style_text_align(ui_TextArea29, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_pad_all(ui_TextArea29, 0, 0);
+    lv_obj_set_style_pad_top(ui_TextArea29, (43 - font->line_height) / 2, 0);
+    lv_obj_set_style_text_letter_space(ui_TextArea29, 0, 0);
+    if (strcmp(lv_label_get_text(ui_TextArea29), text) != 0) lv_label_set_text(ui_TextArea29, text);
 }
 
 void ui_lang_apply_all(void)
