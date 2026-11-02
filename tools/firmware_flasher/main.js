@@ -55,6 +55,21 @@ app.whenReady().then(() => {
         if (win.isResizable() || win.isMaximizable()) throw Error('Window must be fixed size');
         if (bundled) for (const role of ['main','screen-new','screen-old']) await programmer.inspect({role,preset:'Release'});
         if (bundled) programmer.verifyRuntime();
+        if (process.argv.includes('--preview-long-log')) {
+          const fits = await win.webContents.executeJavaScript(`(async () => {
+            const section = document.getElementById('logs').closest('section');
+            const before = section.getBoundingClientRect().width;
+            document.getElementById('log').textContent = 'J-Link diagnostic: ' + '0123456789ABCDEF'.repeat(500) + '\\n' + ('C:/very-long-firmware-path/'.repeat(120));
+            document.getElementById('logs').open = true;
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            const log = document.getElementById('log');
+            return section.getBoundingClientRect().width <= before + 1 &&
+              document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 &&
+              log.scrollWidth <= log.clientWidth + 1;
+          })()`);
+          if (!fits) throw Error('Long log expanded the page or failed to wrap');
+          console.log('PASS: expanded long log wraps without widening the page');
+        }
         if (process.argv.includes('--preview-success')) await win.webContents.executeJavaScript('showSuccess({role:"screen-new", sha256:"preview", file:"screen-new.hex"})');
         const image = await win.webContents.capturePage();
         const capture = process.env.HTP_SMOKE_OUTPUT || path.join(app.getPath('temp'), 'htp-flasher-preview.png');
