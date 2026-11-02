@@ -12,6 +12,10 @@ if not exist "node_modules\.bin\electron.cmd" (
   call npm.cmd ci
   if errorlevel 1 goto failed
 )
+if not exist ".venv\Scripts\python.exe" python -m venv .venv
+if errorlevel 1 goto failed
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+if errorlevel 1 goto failed
 call npm.cmd start
 if errorlevel 1 goto failed
 exit /b 0

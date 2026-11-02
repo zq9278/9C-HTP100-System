@@ -42,3 +42,18 @@ add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.hex
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}> ${CMAKE_PROJECT_NAME}.bin
 )
+
+# Shared, HAL-independent wire contract. Both images must use the same revision.
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/protocol/system_wire.c)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/protocol)
+
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/protocol/config_journal.c)
+
+option(HTP_ENABLE_TUNING "Enable temporary RTT pressure tuning for bench use" OFF)
+if(HTP_ENABLE_TUNING)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE PRESSURE_JLINK_TUNING_ENABLE=1)
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE Middlewares/Third_Party/SEGGER_RTT/RTT/SEGGER_RTT.c)
+    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE Middlewares/Third_Party/SEGGER_RTT/RTT Middlewares/Third_Party/SEGGER_RTT/Config)
+else()
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE PRESSURE_JLINK_TUNING_ENABLE=0)
+endif()

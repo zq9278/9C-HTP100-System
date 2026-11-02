@@ -5,6 +5,7 @@
 #include "app_config.h"
 
 void AppLog_Init(void);
+void AppLog_Tick(void);
 void AppLog_Write(const char *level, const char *format, ...);
 void AppLog_WriteRaw(const char *data, size_t length);
 

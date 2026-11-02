@@ -235,37 +235,41 @@ float Ads1220Driver_PressureFromRaw(int32_t raw, float target_mmhg)
     return pressure < 0.0f ? 0.0f : pressure;
 }
 
-Ads1220Result Ads1220Driver_ZeroCalibrate(void)
+Ads1220Result Ads1220Driver_ZeroPoll(bool begin)
 {
-    int32_t samples[32];
+    static int32_t samples[32];
+    static uint8_t count;
+    static uint32_t settle_started;
+    static bool active;
     int64_t sum = 0;
-    Ads1220Result sensor_result = Ads1220Driver_CheckSensor();
 
-    if (sensor_result != ADS1220_RESULT_OK) {
+    if (begin) {
+        active = false;
+        count = 0;
         g_zero_valid = false;
-        return sensor_result;
+        Ads1220Result sensor_result = Ads1220Driver_CheckSensor();
+        if (sensor_result != ADS1220_RESULT_OK) return sensor_result;
+        settle_started = HAL_GetTick();
+        active = true;
+        return ADS1220_RESULT_BUSY;
     }
-    LOG_PRESSURE_DIAG("[ADS1220] Sensor diagnostic passed: bcs_raw=%ld limits=%ld..%ld",
-         (long)g_sensor_diagnostic_raw,
-         (long)APP_PRESSURE_SHORT_RAW_LIMIT,
-         (long)APP_PRESSURE_OPEN_RAW_LIMIT);
-
-    vTaskDelay(pdMS_TO_TICKS(500U));
-    for (uint8_t index = 0U; index < 32U; ++index) {
-        if (!Ads1220Driver_ReadRaw(&samples[index])) {
-            LOGE("[ADS1220] Zero calibration read failed: sample=%u", (unsigned)index);
-            g_zero_valid = false;
-            return ADS1220_RESULT_COMM;
-        }
-        for (uint8_t position = index;
-             position > 0U && samples[position] < samples[position - 1U];
-             --position) {
-            int32_t temporary = samples[position];
-            samples[position] = samples[position - 1U];
-            samples[position - 1U] = temporary;
-        }
+    if (!active) return ADS1220_RESULT_COMM;
+    if (HAL_GetTick() - settle_started < 500U) return ADS1220_RESULT_BUSY;
+    if (!Ads1220Driver_ReadRaw(&samples[count])) {
+        active = false;
+        return ADS1220_RESULT_COMM;
     }
-    if (Ads1220Driver_PressureFromRaw(samples[27] - samples[4] + g_zero_raw,
+    for (uint8_t position = count;
+         position > 0U && samples[position] < samples[position - 1U]; --position) {
+        int32_t temporary = samples[position];
+        samples[position] = samples[position - 1U];
+        samples[position - 1U] = temporary;
+    }
+    if (++count < 32U) return ADS1220_RESULT_BUSY;
+    active = false;
+    /* Lower ADC counts mean higher pressure. The former positive delta was
+     * clamped to zero by PressureFromRaw, masking unstable calibration. */
+    if (Ads1220Driver_PressureFromRaw(g_zero_raw - (samples[27] - samples[4]),
                                       350.0f) > 20.0f) {
         LOGE("[ADS1220] Zero calibration unstable: low=%ld high=%ld",
              (long)samples[4], (long)samples[27]);

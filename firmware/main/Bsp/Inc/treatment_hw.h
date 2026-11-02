@@ -6,6 +6,8 @@
 #include "app_port.h"
 
 void TreatmentHw_Init(void);
+bool TreatmentHw_OutputsActive(void);
+bool TreatmentHw_PressureSampleValid(void);
 void TreatmentHw_SafeOutputsOff(void);
 bool TreatmentHw_HeaterControl(float target_c, float *measured_c);
 bool TreatmentHw_SetHeatPid(float kp, float ki, float kd);

@@ -247,6 +247,8 @@ SECTIONS
   } >FLASH
 
   /* User_heap_stack section, used to check that there is enough RAM left */
+  .noinit (NOLOAD) : { . = ALIGN(4); *(.noinit*) . = ALIGN(4); } >DTCMRAM
+
   ._user_heap_stack (NOLOAD) :
   {
     . = ALIGN(8);

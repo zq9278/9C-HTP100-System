@@ -48,8 +48,6 @@
 #define LVGL_MemoryAdd2 (LVGL_MemoryAdd1 + 480 * 640 * 2)
 #define LVGL_MemoryAdd3 (LVGL_MemoryAdd2 + 480 * 640 * 2) // 显示缓冲区地�?????
 extern bool lv_disp_updated;
-static uint16_t counter = 0; // ��???���������ڼ����жϴ���
-static uint16_t INT = 0;     // ��???���������ڼ����жϴ���
 uint16_t Tim7Cnt;
 uint16_t Tim7_flag_20ms;
 uint16_t Tim7_flag_40ms;
@@ -458,59 +456,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             Tim7Cnt = 0; // ���ü�����
         }
   }
-  if (htim == &htim14)
-  {
-    if (seconds == 0)
-    {
-      if (minutes > 0)
-      {
+  /* Treatment time is received from the controller in the main loop. */
 
-        minutes--;
-        seconds = 59;
-        switch (work_mode)
-        {
-        case 1:
-          lv_label_set_text_fmt(ui_cut_d_l11, "%02d", minutes); // ��ʾ����
-          lv_label_set_text_fmt(ui_cut_d_l12, "%02d", seconds); // ��ʾ����
-          break;
-        case 2:
-          lv_label_set_text_fmt(ui_cut_d_l21, "%02d", minutes); // ��ʾ����
-          lv_label_set_text_fmt(ui_cut_d_l22, "%02d", seconds); // ��ʾ����
-          break;
-        case 3:
-          lv_label_set_text_fmt(ui_cut_d_l31, "%02d", minutes); // ��ʾ����
-          lv_label_set_text_fmt(ui_cut_d_l32, "%02d", seconds); // ��ʾ����
-          break;
-        default:
-          break;
-        }
-      }
-      else
-      {
-			 work_finish = 1; // 0 没结束，1 工作完成
-      }
-    }
-    else
-    {
-      seconds--;
-      switch (work_mode)
-      {
-      case 1:
-        lv_label_set_text_fmt(ui_cut_d_l12, "%02d", seconds); // ��ʾ����
-        break;
-      case 2:
-        lv_label_set_text_fmt(ui_cut_d_l22, "%02d", seconds); // ��ʾ����
-        break;
-      case 3:
-        lv_label_set_text_fmt(ui_cut_d_l32, "%02d", seconds); // ��ʾ����
-        break;
-      default:
-        break;
-      }
-      // lv_label_set_text_fmt(ui_cut_d_l12, "%02d", seconds);
-      // HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_14);
-    }
-  }
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {

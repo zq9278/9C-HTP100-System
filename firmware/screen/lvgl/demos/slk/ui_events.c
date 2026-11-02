@@ -4,6 +4,7 @@
 // Project name: SLK01
 
 #include "screen.h"
+#include "screen_link.h"
 #include "stm32h7xx_hal.h"
 #include "ui.h"
 #include <stdint.h>
@@ -24,8 +25,6 @@ extern int value4;
 extern uint8_t usart1_tx;
 extern uint16_t prepare_set, bee, prepare_time, prepare_crimp;
 uint16_t language = UI_LANG_ZH;
-static lv_obj_t *global_img = NULL;  // 全局图片对象
-static lv_obj_t *global_img2 = NULL;  // 全局图片对象
 // extern DMA_HandleTypeDef hdma_usart1_tx;
 volatile uint8_t work_mode =
     0; // 0:娌″伐浣溿€?1锛氱儹鏁枫€?2锛氳剦鍐层€?3锛氳嚜鍔?
@@ -62,62 +61,16 @@ void BEE1(lv_event_t *e) {
   }
 }
 void hot_start_on(lv_event_t *e) {
-  if (work_mode == 1&&EYE_status==1) {
-    lv_obj_add_flag(ui_Image5, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag(ui_Image70,LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
-    volatile static AXI_SRAM  CTRL_MSG pData;
-    pData.cmd_head_high = 0x5A;
-    pData.cmd_head_low = 0xA5;
-    pData.frame_length = 0x0d;
-    pData.cmd_type_high = 0x10;
-    pData.cmd_type_low = 0x40;
-    pData.data = 0;
-    pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-    pData.end_high = 0xff; // 甯у熬 // 甯у熬
-    pData.end_low = 0xff;  // 甯у熬
-                           // SCB_CleanInvalidateDCache();
-    UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-    
-  }
+  (void)e;
+  if (work_mode == 1) (void)ScreenLink_Request(0x1040, 0, 0);
 }
 void press_start_on(lv_event_t *e) {
-  if (work_mode == 2&&EYE_status==1) {
-
-    lv_obj_add_flag(ui_Image22, LV_OBJ_FLAG_CLICKABLE);
-lv_obj_add_flag(ui_Image74,
-                  LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
-    volatile static AXI_SRAM  CTRL_MSG pData;
-    pData.cmd_head_high = 0x5A;
-    pData.cmd_head_low = 0xA5;
-    pData.frame_length = 0x0d;
-    pData.cmd_type_high = 0x10;
-    pData.cmd_type_low = 0x06;
-    pData.data = 0;
-    pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-    pData.end_high = 0xff; // 甯у熬 // 甯у熬
-    pData.end_low = 0xff;  // 甯у熬
-                           // SCB_CleanInvalidateDCache();
-    UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-  }
+  (void)e;
+  if (work_mode == 2) (void)ScreenLink_Request(0x1006, 0, 0);
 }
 void auto_start_on(lv_event_t *e) {
-  if (work_mode == 3&&EYE_status==1) {
-lv_obj_add_flag(ui_Image75,
-                  LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
-    lv_obj_add_flag(ui_Image55, LV_OBJ_FLAG_CLICKABLE);
-    volatile static AXI_SRAM CTRL_MSG  pData;
-    pData.cmd_head_high = 0x5A;
-    pData.cmd_head_low = 0xA5;
-    pData.frame_length = 0x0d;
-    pData.cmd_type_high = 0x10;
-    pData.cmd_type_low = 0x36;
-    pData.data = 0;
-    pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-    pData.end_high = 0xff; // 甯у熬 // 甯у熬
-    pData.end_low = 0xff;  // 甯у熬
-                           // SCB_CleanInvalidateDCache();
-    UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-  }
+  (void)e;
+  if (work_mode == 3) (void)ScreenLink_Request(0x1036, 0, 0);
 }
 char buffer[10]; // 预留足够空间
 void auto_set_value(lv_event_t *e) {
@@ -186,7 +139,7 @@ void auto_set_value(lv_event_t *e) {
   }
 }
 void hot_start(lv_event_t *e) {
-  if(work_mode == 0) {
+  if(work_mode == 0 && ScreenLink_Healthy() && !ScreenLink_Pending()) {
     _ui_screen_change(&ui_hotting, LV_SCR_LOAD_ANIM_NONE, 0, 0,
                         &ui_hotting_screen_init);
  lv_obj_clear_flag(ui_Image5, LV_OBJ_FLAG_CLICKABLE); // 禁用点击
@@ -217,7 +170,7 @@ void hot_start(lv_event_t *e) {
  
 }
 void pulsation_start(lv_event_t *e) {
-  if(work_mode == 0) {
+  if(work_mode == 0 && ScreenLink_Healthy() && !ScreenLink_Pending()) {
     lv_obj_set_style_text_color(ui_Label32, lv_color_make(255, 255, 255), 0); // 白色
     _ui_screen_change(&ui_pulsationning, LV_SCR_LOAD_ANIM_NONE, 0, 0,
                         &ui_pulsationning_screen_init);
@@ -236,7 +189,6 @@ void pulsation_start(lv_event_t *e) {
   screen_reset_pulsationning_runtime_ui();
   // HAL_TIM_Base_Start_IT(&htim14);
   volatile static AXI_SRAM  CTRL_MSG pData;
-  extern lv_obj_t *ui_Panel69;
   pData.cmd_head_high = 0x5A;
   pData.cmd_head_low = 0xA5;
   pData.frame_length = 0x0d;
@@ -252,7 +204,7 @@ void pulsation_start(lv_event_t *e) {
 
 }
 void auto_start(lv_event_t *e) {
-  if(work_mode == 0) {
+  if(work_mode == 0 && ScreenLink_Healthy() && !ScreenLink_Pending()) {
     _ui_screen_change(&ui_autoing, LV_SCR_LOAD_ANIM_NONE, 0, 0,
                         &ui_autoing_screen_init);
   
@@ -285,66 +237,16 @@ void auto_start(lv_event_t *e) {
 }
 }
 void hot_stop(lv_event_t *e) {
-  if (work_mode == 1) {
-   lv_obj_clear_flag(ui_Image53, LV_OBJ_FLAG_HIDDEN);    /// 显示开始按钮
-   lv_obj_clear_flag(ui_Container10, LV_OBJ_FLAG_HIDDEN);    /// 显示开始按钮
-    BEE1(e);
-    work_mode = 0;
-    volatile static AXI_SRAM  CTRL_MSG pData;
-    HAL_TIM_Base_Stop_IT(&htim14);
-    pData.cmd_head_high = 0x5A;
-    pData.cmd_head_low = 0xA5;
-    pData.frame_length = 0x0d;
-    pData.cmd_type_high = 0x10;
-    pData.cmd_type_low = 0x30;
-    pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-    pData.end_high = 0xff; // 甯у熬 // 甯у熬
-    pData.end_low = 0xff;  // 甯у熬
-    // SCB_CleanInvalidateDCache();
-    UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-    lv_label_set_text_fmt(ui_cut_d_l11, "%02d", 0); // 鏄剧ず鍒嗛挓
-    lv_label_set_text_fmt(ui_cut_d_l12, "%02d", 0); // 鏄剧ず绉掗拡
-  }
+  (void)e;
+  if (work_mode == 1) (void)ScreenLink_Request(0x1030, 0, 0);
 }
 void pulsation_stop(lv_event_t *e) {
-  if (work_mode == 2) {
-    lv_obj_clear_flag(ui_Image56, LV_OBJ_FLAG_HIDDEN);    /// 显示开始按钮
-   lv_obj_clear_flag(ui_Container4, LV_OBJ_FLAG_HIDDEN);    /// 显示开始按钮
-    BEE1(e);
-    work_mode = 0;
-    HAL_TIM_Base_Stop_IT(&htim14);
-    volatile static AXI_SRAM  CTRL_MSG pData;
-    pData.cmd_head_high = 0x5A;
-    pData.cmd_head_low = 0xA5;
-    pData.frame_length = 0x0d;
-    pData.cmd_type_high = 0x10;
-    pData.cmd_type_low = 0x34;
-    pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-    pData.end_high = 0xff; // 甯у熬 // 甯у熬
-    pData.end_low = 0xff;  // 甯у熬
-    // SCB_CleanInvalidateDCache();
-    UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-  }
+  (void)e;
+  if (work_mode == 2) (void)ScreenLink_Request(0x1034, 0, 0);
 }
 void auto_stop(lv_event_t *e) {
-  if (work_mode == 3) {
-    lv_obj_clear_flag(ui_Image57, LV_OBJ_FLAG_HIDDEN);    /// 显示开始按钮
-   lv_obj_clear_flag(ui_Container7, LV_OBJ_FLAG_HIDDEN);    /// 显示开始按钮
-    BEE1(e);
-    work_mode = 0;
-    HAL_TIM_Base_Stop_IT(&htim14);
-    volatile static AXI_SRAM  CTRL_MSG pData;
-    pData.cmd_head_high = 0x5A;
-    pData.cmd_head_low = 0xA5;
-    pData.frame_length = 0x0d;
-    pData.cmd_type_high = 0x10;
-    pData.cmd_type_low = 0x38;
-    pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-    pData.end_high = 0xff; // 甯у熬 // 甯у熬
-    pData.end_low = 0xff;  // 甯у熬
-    // SCB_CleanInvalidateDCache();
-    UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-  }
+  (void)e;
+  if (work_mode == 3) (void)ScreenLink_Request(0x1038, 0, 0);
 }
 void prepare_set1(lv_event_t *e) {
   if (prepare_set == 1) {
@@ -589,63 +491,11 @@ void time_sub(lv_event_t *e) {
 }
 uint32_t save_picture_time;
 void save_prepare_set_pre(lv_event_t *e) {
-  int press, time;
-  press = atoi(lv_label_get_text(ui_Label6));
-  time = atoi(lv_label_get_text(ui_Label8));
-  volatile static AXI_SRAM prepare_data pData;
-  pData.cmd_head_high = 0x6A;
-  pData.cmd_head_low = 0xA6;
-  pData.frame_length = 0x0b;
-  pData.cmd_type_high = 0x10;
-  pData.cmd_type_low = 0x42;
-  switch (prepare_set_pre) {
-  case 1:
-    pData.value = 1;
-    break;
-  case 2:
-    pData.value = 2;
-    break;
-  case 3:
-    pData.value = 3;
-    break;
-  }
-  pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-  pData.end_high = 0xff; // 甯у熬 // 甯у熬
-  pData.end_low =
-      0xff; // 甯у熬
-            // SCB_CleanInvalidateDCache();
-            // HAL_UART_Transmit(&huart1, (uint8_t *)&pData, sizeof(pData),100);
-  pData.cmd_type_low = 0x40;
-  pData.value = press;
-  pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-  // SCB_CleanInvalidateDCache();
-  UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-  pData.cmd_type_low = 0x41;
-  pData.value = time;
-  pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-  // SCB_CleanInvalidateDCache();
-  UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-  pData.cmd_type_low = 0x44;
-  switch (prepare_set) {
-    case 0:
-    pData.value = 0;
-		break;
-  case 1:
-    pData.value = 1;
-    break;
-  case 2:
-    pData.value = 2;
-    break;
-  case 3:
-    pData.value = 3;
-    break;
-  }
-  pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-  // SCB_CleanInvalidateDCache();
-  UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-
-  lv_obj_clear_flag(ui_Image107, LV_OBJ_FLAG_HIDDEN); /// Flags
-  save_picture_time = HAL_GetTick();
+  (void)e;
+  int pressure = atoi(lv_label_get_text(ui_Label6));
+  int duration = atoi(lv_label_get_text(ui_Label8));
+  if (prepare_set_pre >= 1 && prepare_set_pre <= 3)
+    (void)ScreenLink_Request((uint16_t)(0x9100U + prepare_set_pre), (float)pressure, (uint16_t)(duration * 60));
 }
 uint8_t formattee_value = 0;
 void formattee(lv_event_t *e) {

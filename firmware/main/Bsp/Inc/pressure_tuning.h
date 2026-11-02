@@ -7,10 +7,10 @@
 #define PRESSURE_TUNING_PROFILE_COUNT 5U
 
 typedef struct {
-    float fast_speed;
-    float retract_speed;
-    float kp;
-    float approach_ratio; /* ?????????????????? */
+    float fast_speed; /* 前进速度上限，驱动器速度单位 */
+    float retract_speed; /* 回退及反向补偿速度上限 */
+    float kp; /* 压差到速度的比例增益 */
+    float approach_ratio; /* 减速区间占目标压力的比例，0.01～1 */
 } PressureTuningProfile;
 
 void PressureTuning_Init(void);

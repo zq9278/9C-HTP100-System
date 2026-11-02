@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "safety_monitor.h"
 #include "cmsis_os.h"
 #include "dma.h"
 #include "i2c.h"
@@ -199,6 +200,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM6)
   {
     HAL_IncTick();
+    SafetyMonitor_TickFromIsr();
   }
   /* USER CODE BEGIN Callback 1 */
 if (htim == &htim17) {
@@ -233,6 +235,7 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
     LOGE("[System] HAL error handler entered");
+  SafetyMonitor_EmergencyOff();
   __disable_irq();
 
 

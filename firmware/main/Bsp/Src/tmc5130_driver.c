@@ -1,4 +1,5 @@
 #include "tmc5130_driver.h"
+#include "safety_monitor.h"
 
 #include <stddef.h>
 
@@ -26,6 +27,7 @@ void Tmc5130Driver_Init(void)
 
 void Tmc5130Driver_Enable(bool enable)
 {
+    if (enable && SafetyMonitor_Tripped()) enable = false;
     HAL_GPIO_WritePin(TMC_ENN_GPIO_Port, TMC_ENN_Pin,
                       enable ? GPIO_PIN_RESET : GPIO_PIN_SET);
 }
@@ -117,10 +119,12 @@ bool Tmc5130Driver_Configure(void)
         {0x01U, 0x00000001U}, {0x6CU, 0x000300C3U}, {0x10U, 0x00000C04U},
         {0x11U, 0x0000000AU}, {0x00U, 0x00000004U}, {0x13U, 0x000001F4U},
         {0x70U, 0x000701C8U}, {0x25U, 0x00015000U}, {0x24U, 0x00000001U},
-        {0x26U, 0x00001001U}, {0x27U, 0x00004000U}, {0x28U, 0x00001FFFU},
+        {0x26U, 0x00001001U}, {0x27U, 0U}, {0x28U, 0x00001FFFU},
         {0x2AU, 0x00008000U}, {0x2BU, 0x0000000AU}, {0x20U, 0x00000000U}
     };
 
+    /* Reconfiguration must not move toward a stale XTARGET in position mode. */
+    Tmc5130Driver_Enable(false);
     if (!Tmc5130Driver_Probe()) {
         return false;
     }
@@ -141,6 +145,8 @@ bool Tmc5130Driver_SetSpeed(int32_t speed)
         if (g_vmax_valid && g_last_vmax == 0U) return true;
         return Tmc5130Driver_Write(0x27U, 0U) == HAL_OK;
     }
+    if (speed > 65535) speed = 65535;
+    if (speed < -65535) speed = -65535;
     magnitude = speed < 0 ? (uint32_t)(-(int64_t)speed) : (uint32_t)speed;
     ramp_mode = speed < 0 ? 1U : 2U;
     if ((!g_ramp_mode_valid || g_last_ramp_mode != ramp_mode) &&

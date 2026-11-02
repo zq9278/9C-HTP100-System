@@ -22,6 +22,8 @@ fi
 if [[ ! -x node_modules/.bin/electron ]]; then
   npm ci || { echo '依赖安装失败。'; read -r -p '按回车关闭窗口…' _; exit 1; }
 fi
+[[ -x .venv/bin/python ]] || python3 -m venv .venv || exit 1
+.venv/bin/python -m pip install -r requirements.txt || exit 1
 npm start
 result=$?
 if [[ $result -ne 0 ]]; then read -r -p '启动失败，按回车关闭窗口…' _; fi

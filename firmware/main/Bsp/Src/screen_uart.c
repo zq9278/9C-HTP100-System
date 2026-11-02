@@ -13,10 +13,11 @@ static uint8_t g_ring[SCREEN_RING_SIZE];
 static volatile uint16_t g_write;
 static volatile uint16_t g_read;
 static bool g_initialized;
+volatile uint32_t g_screen_rx_overflows, g_screen_rx_restart_failures;
 
 static void screen_uart_start_receive(void)
 {
-    (void)HAL_UARTEx_ReceiveToIdle_DMA(&huart2, g_dma, sizeof(g_dma));
+    if (HAL_UARTEx_ReceiveToIdle_DMA(&huart2, g_dma, sizeof(g_dma)) != HAL_OK) g_screen_rx_restart_failures++;
     __HAL_DMA_DISABLE_IT(huart2.hdmarx, DMA_IT_HT);
 }
 
@@ -50,6 +51,8 @@ bool ScreenUart_Write(const uint8_t *data, uint16_t length)
 
 size_t ScreenUart_Read(uint8_t *destination, size_t capacity)
 {
+    /* Recover a failed ISR re-arm in task context. BUSY_RX is left untouched. */
+    if (g_initialized && huart2.RxState == HAL_UART_STATE_READY) screen_uart_start_receive();
     size_t count = 0U;
 
     taskENTER_CRITICAL();
@@ -66,6 +69,7 @@ void ScreenUart_RxEventFromIsr(uint16_t length)
     for (uint16_t index = 0U; index < length && index < SCREEN_RX_DMA_SIZE; ++index) {
         uint16_t next = (uint16_t)((g_write + 1U) % SCREEN_RING_SIZE);
         if (next == g_read) {
+            g_screen_rx_overflows++;
             break;
         }
         g_ring[g_write] = g_dma[index];

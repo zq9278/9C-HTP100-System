@@ -53,7 +53,13 @@ static void pressure_stop(void) { }
 static bool home_begin(void) { home_begin_count++; return true; }
 static AppAsyncResult home_poll(void) { home_poll_count++; return fake_home_result; }
 static void home_cancel(void) { home_cancel_count++; }
-static AppFault zero_calibrate(void) { return fake_zero_fault; }
+static unsigned fake_zero_busy;
+static AppAsyncResult zero_calibrate(bool begin, AppFault *fault) {
+    (void)begin;
+    *fault = fake_zero_fault;
+    if (fake_zero_busy) { --fake_zero_busy; return APP_ASYNC_BUSY; }
+    return *fault == APP_FAULT_NONE ? APP_ASYNC_OK : APP_ASYNC_FAILED;
+}
 static AppEyeState eye_read(void) { return fake_eye; }
 static bool eye_consume(void) { eye_consume_count++; return true; }
 static bool power_read(bool *charging, bool *full, uint16_t *soc, uint16_t *mv)
@@ -93,7 +99,7 @@ static const AppPort port = {
     now_ms, outputs_off, heat, pressure_start, pressure_step, pressure_stop,
     home_begin, home_poll, home_cancel, zero_calibrate, eye_read, eye_consume, power_read,
     power_off, led_set, count, screen_boot_sync, storage_read, storage_write,
-    storage_erase, storage_erase, screen_float, screen_u16, screen_u32, fault
+    storage_erase, storage_erase, screen_float, screen_u16, screen_u32, fault, NULL, NULL
 };
 
 static void reset_fixture(void)
@@ -106,6 +112,7 @@ static void reset_fixture(void)
     fake_pressure_override = false;
     fake_pressure_measured = 0.0f;
     fake_zero_fault = APP_FAULT_NONE;
+    fake_zero_busy = 0;
     home_begin_count = home_poll_count = home_cancel_count = eye_consume_count = 0U;
     treatment_count = power_off_count = pressure_start_count = 0U;
     eye_screen_count = 0U;

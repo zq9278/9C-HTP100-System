@@ -1,6 +1,7 @@
 #include "app_controller.h"
 
 #include <stddef.h>
+#include <math.h>
 #include <string.h>
 
 #include "app_config.h"
@@ -43,10 +44,14 @@ typedef struct {
     bool count_recorded;
     bool pending_power_off;
     bool home_started;
+    bool zero_pending;
     bool quick_resume_active;
     bool reusable_pressure_zero;
     bool power_state_logged;
     bool debug_mode;
+    bool screen_link_healthy;
+    uint32_t treatment_started_ms;
+    uint32_t treatment_duration_ms;
 } AppContext;
 
 static AppContext g_app;
@@ -200,6 +205,8 @@ static void begin_home(void)
     g_app.temp_comm_failure_timing = false;
     g_app.home_started = false;
 
+    g_app.zero_pending = false;
+
     if (g_app.port != NULL && g_app.port->home_begin != NULL && g_app.port->home_begin()) {
         g_app.home_started = true;
     } else {
@@ -247,6 +254,7 @@ void AppController_Init(const AppPort *port)
     g_app.status.settings.pressure_mmhg = 350.0f;
     g_app.status.settings.runtime_minutes = 1U;
     g_app.eye_link_healthy = true;
+    g_app.screen_link_healthy = true;
     safe_outputs_off();
     begin_home();
     set_led();
@@ -261,7 +269,8 @@ bool AppController_Prepare(AppMode mode, float pressure_mmhg)
     bool quick_request = g_app.status.state == APP_STATE_HOMING &&
                          stop_allows_quick_resume(g_app.status.stop_reason);
 
-    if (mode == APP_MODE_NONE ||
+    if (!g_app.screen_link_healthy || mode < APP_MODE_HEAT || mode > APP_MODE_AUTO ||
+        (mode_uses_pressure(mode) && (!isfinite(pressure_mmhg) || pressure_mmhg <= 0.0f || pressure_mmhg > APP_MAX_TARGET_PRESSURE_MMHG)) ||
         (g_app.status.charging && !g_app.debug_mode) ||
         g_app.status.fault != APP_FAULT_NONE || !eye_valid ||
         (!quick_request &&
@@ -295,13 +304,15 @@ bool AppController_Prepare(AppMode mode, float pressure_mmhg)
         return false;
     }
 
+    g_app.status.session_id++;
+    g_app.status.remaining_ms = (uint32_t)g_app.status.settings.runtime_minutes * 60000U;
     g_app.status.mode = mode;
     g_app.status.stop_reason = APP_STOP_NONE;
     g_app.status.fault = APP_FAULT_NONE;
     g_app.count_recorded = false;
     g_app.display_temperature_valid = false;
     g_app.status.temperature_valid = false;
-    if (pressure_mmhg > 0.0f) {
+    if (isfinite(pressure_mmhg) && pressure_mmhg > 0.0f && pressure_mmhg <= APP_MAX_TARGET_PRESSURE_MMHG) {
         g_app.status.settings.pressure_mmhg = pressure_mmhg;
     }
 
@@ -318,7 +329,8 @@ bool AppController_Prepare(AppMode mode, float pressure_mmhg)
 
 bool AppController_Start(void)
 {
-    if ((g_app.status.state != APP_STATE_PREHEAT && g_app.status.state != APP_STATE_READY) ||
+    if (!g_app.screen_link_healthy || !g_app.eye_link_healthy ||
+        (g_app.status.state != APP_STATE_PREHEAT && g_app.status.state != APP_STATE_READY) ||
         (g_app.status.charging && !g_app.debug_mode) ||
         (!g_app.status.home_valid && !g_app.quick_resume_active) ||
         (mode_uses_pressure(g_app.status.mode) && !g_app.status.pressure_zero_valid)) {
@@ -342,6 +354,9 @@ bool AppController_Start(void)
     }
 
     g_app.status.state = APP_STATE_RUNNING;
+    g_app.treatment_started_ms = now_ms();
+    g_app.treatment_duration_ms = (uint32_t)g_app.status.settings.runtime_minutes * 60000U;
+    g_app.status.remaining_ms = g_app.treatment_duration_ms;
     g_app.last_heat_ms = now_ms();
     g_app.last_pressure_ms = g_app.last_heat_ms;
     if (g_app.port != NULL && g_app.port->screen_float != NULL) {
@@ -361,11 +376,13 @@ void AppController_Stop(AppStopReason reason)
         (reason == APP_STOP_USER && !treatment_is_open())) {
         return;
     }
+    safe_outputs_off();
+    g_app.status.remaining_ms = 0U;
+    g_app.status.pressure_valid = false;
     g_app.status.stop_reason = reason;
     g_app.over_temperature_timing = false;
     LOGI("[App] Treatment stop: reason=%u state=%u", (unsigned)reason,
          (unsigned)g_app.status.state);
-    safe_outputs_off();
     record_natural_finish_once();
     if (g_app.port != NULL && g_app.port->screen_float != NULL) {
         g_app.port->screen_float(SCREEN_TIMER_STOP, 0.0f);
@@ -384,6 +401,17 @@ void AppController_Stop(AppStopReason reason)
 
 void AppController_RaiseFault(AppFault fault)
 {
+    if (fault == APP_FAULT_CONTROL_STALE) {
+        if (g_app.status.fault == fault && g_app.status.state == APP_STATE_FAULT) return;
+        safe_outputs_off();
+        g_app.status.fault = fault; g_app.status.state = APP_STATE_FAULT;
+        g_app.status.remaining_ms = 0; g_app.status.home_valid = false;
+        g_app.status.temperature_valid = g_app.status.pressure_valid = false;
+        g_app.home_started = g_app.zero_pending = false;
+        g_app.status.stop_reason = APP_STOP_FAULT;
+        set_led();
+        return; /* Panic-disabled outputs require a reset; never start homing. */
+    }
     if (fault == APP_FAULT_NONE) {
         return;
     }
@@ -543,6 +571,18 @@ void AppController_SetEyeLinkHealthy(bool healthy)
     LOGI("[Eye] I2C link recovered inside reconnect window");
 }
 
+void AppController_SetScreenLinkHealthy(bool healthy)
+{
+    g_app.screen_link_healthy = healthy;
+    if (!healthy && treatment_is_open()) AppController_RaiseFault(APP_FAULT_SCREEN_TIMEOUT);
+    if (healthy && g_app.status.fault == APP_FAULT_SCREEN_TIMEOUT &&
+        g_app.status.state == APP_STATE_FAULT && g_app.status.home_valid) {
+        g_app.status.fault = APP_FAULT_NONE;
+        g_app.status.state = APP_STATE_IDLE;
+        set_led();
+    }
+}
+
 void AppController_NotifyPowerLoss(void)
 {
     if (g_app.status.charging) {
@@ -559,23 +599,23 @@ void AppController_NotifyPowerLoss(void)
 
 void AppController_SetTemperature(float temperature_c)
 {
-    if (temperature_c > 0.0f) {
+    if (isfinite(temperature_c) && temperature_c > 0.0f && temperature_c <= APP_MAX_TARGET_TEMPERATURE_C) {
         g_app.status.settings.temperature_c = temperature_c;
     }
 }
 
 void AppController_SetPressure(float pressure_mmhg)
 {
-    if (pressure_mmhg > 0.0f) {
+    if (isfinite(pressure_mmhg) && pressure_mmhg > 0.0f && pressure_mmhg <= APP_MAX_TARGET_PRESSURE_MMHG) {
         g_app.status.settings.pressure_mmhg = pressure_mmhg;
     }
 }
 
 void AppController_SetRuntime(uint16_t minutes)
 {
-    if (minutes > 0U) {
-        /* The existing screen remains the countdown owner. */
+    if (minutes > 0U && minutes <= APP_MAX_RUNTIME_MINUTES && g_app.status.state != APP_STATE_RUNNING) {
         g_app.status.settings.runtime_minutes = minutes;
+        g_app.status.remaining_ms = (uint32_t)minutes * 60000U;
     }
 }
 
@@ -598,6 +638,14 @@ bool AppController_DebugMode(void)
     return g_app.debug_mode;
 }
 
+bool AppController_SavePreset(uint8_t preset, uint16_t pressure, uint16_t minutes)
+{
+    if (g_app.status.state != APP_STATE_IDLE || !g_app.port || !g_app.port->save_preset) return false;
+    if (!g_app.port->save_preset(preset, pressure, minutes)) return false;
+    if (g_app.port->screen_boot_sync) g_app.port->screen_boot_sync();
+    return true;
+}
+
 void AppController_ScreenBoot(void)
 {
     if (g_app.port != NULL && g_app.port->screen_boot_sync != NULL) {
@@ -613,20 +661,21 @@ uint16_t AppController_StorageRead(uint8_t address, uint16_t default_value)
 
 bool AppController_StorageWrite(uint8_t address, uint16_t value)
 {
-    return g_app.port != NULL && g_app.port->storage_write_u16 != NULL &&
+    return !treatment_is_open() && g_app.status.state == APP_STATE_IDLE &&
+           g_app.port != NULL && g_app.port->storage_write_u16 != NULL &&
            g_app.port->storage_write_u16(address, value);
 }
 
 void AppController_StorageEraseMain(void)
 {
-    if (g_app.port != NULL && g_app.port->storage_erase_main != NULL) {
+    if (g_app.debug_mode && g_app.status.state == APP_STATE_IDLE && g_app.port != NULL && g_app.port->storage_erase_main != NULL) {
         g_app.port->storage_erase_main();
     }
 }
 
 void AppController_StorageEraseEye(void)
 {
-    if (g_app.port != NULL && g_app.port->storage_erase_eye != NULL) {
+    if (g_app.debug_mode && g_app.status.state == APP_STATE_IDLE && g_app.port != NULL && g_app.port->storage_erase_eye != NULL) {
         g_app.port->storage_erase_eye();
     }
 }
@@ -635,10 +684,12 @@ static void tick_homing(void)
 {
     AppAsyncResult result;
     AppFault zero_fault;
+    bool begin_zero = false;
 
-    if (!g_app.home_started || g_app.port == NULL || g_app.port->home_poll == NULL) {
+    if ((!g_app.home_started && !g_app.zero_pending) || g_app.port == NULL || g_app.port->home_poll == NULL) {
         return;
     }
+    if (!g_app.zero_pending) {
     result = g_app.port->home_poll();
     if (result == APP_ASYNC_BUSY) {
         return;
@@ -662,8 +713,14 @@ static void tick_homing(void)
     }
 
     g_app.status.home_valid = true;
-    zero_fault = g_app.port->pressure_zero_calibrate != NULL ?
-                 g_app.port->pressure_zero_calibrate() : APP_FAULT_PRESSURE_COMM;
+    begin_zero = true;
+    g_app.zero_pending = true;
+    }
+    zero_fault = APP_FAULT_PRESSURE_COMM;
+    result = g_app.port->pressure_zero_poll != NULL ?
+             g_app.port->pressure_zero_poll(begin_zero, &zero_fault) : APP_ASYNC_FAILED;
+    if (result == APP_ASYNC_BUSY) return;
+    g_app.zero_pending = false;
     g_app.status.pressure_zero_valid = zero_fault == APP_FAULT_NONE;
     if (zero_fault != APP_FAULT_NONE) {
         g_app.status.fault = zero_fault;
@@ -720,7 +777,7 @@ static void tick_heat(uint32_t now)
         if (!g_app.temp_comm_failure_timing) {
             g_app.temp_comm_failure_timing = true;
             g_app.temp_comm_failure_started_ms = now;
-            LOGW("[Temp] Read failed; retaining outputs during %lums confirmation window",
+            LOGW("[Temp] Read failed; heating inhibited during %lums confirmation window",
                  (unsigned long)APP_TEMP_COMM_FAULT_CONFIRM_MS);
         } else if (now - g_app.temp_comm_failure_started_ms >=
                    APP_TEMP_COMM_FAULT_CONFIRM_MS) {
@@ -766,6 +823,7 @@ static void tick_heat(uint32_t now)
         g_app.display_temperature_c += APP_TEMP_DISPLAY_FILTER_ALPHA *
                                        (measured - g_app.display_temperature_c);
     }
+    g_app.status.display_temperature_c = fminf(g_app.display_temperature_c - PRODUCT_TEMPERATURE_CONTROL_COMPENSATION_C, APP_MAX_DISPLAY_TEMPERATURE_C);
     if (now - g_app.last_temp_display_ms >= APP_TEMP_DISPLAY_PERIOD_MS) {
         screen_temperature = g_app.display_temperature_c -
                              PRODUCT_TEMPERATURE_CONTROL_COMPENSATION_C;
@@ -806,10 +864,14 @@ static void tick_pressure(uint32_t now)
     fault = g_app.port->pressure_control_step(g_app.status.settings.pressure_mmhg,
                                               &measured);
     if (fault != APP_FAULT_NONE) {
+        g_app.status.pressure_valid = false;
         PressureLimit_Reset(&g_app.pressure_limit);
         AppController_RaiseFault(fault);
         return;
     }
+    g_app.status.measured_pressure_mmhg = measured;
+    g_app.status.pressure_valid = isfinite(measured) &&
+        (!g_app.port->pressure_sample_valid || g_app.port->pressure_sample_valid());
     if (PressureLimit_Update(&g_app.pressure_limit, measured, now_ms())) {
         /* Stop the motor before formatting or transmitting fault diagnostics. */
         if (g_app.port != NULL && g_app.port->pressure_control_stop != NULL) {
@@ -828,6 +890,14 @@ void AppController_Tick(void)
 {
     uint32_t now = now_ms();
 
+    if (g_app.status.state == APP_STATE_RUNNING) {
+        uint32_t elapsed = now - g_app.treatment_started_ms;
+        if (elapsed >= g_app.treatment_duration_ms) {
+            AppController_Stop(APP_STOP_NATURAL);
+            return;
+        }
+        g_app.status.remaining_ms = g_app.treatment_duration_ms - elapsed;
+    }
     try_clear_tmp112_fault();
     if (!g_app.eye_link_healthy && treatment_is_open()) {
         return;

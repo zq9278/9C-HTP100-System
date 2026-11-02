@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "board_port.h"
+#include "safety_monitor.h"
 
 /* USER CODE END Includes */
 
@@ -95,6 +96,7 @@ void HardFault_Handler_C(unsigned int * hardfault_args)
   taskDISABLE_INTERRUPTS();
   for (;;);
 #endif
+  SafetyMonitor_EmergencyOff();
   extern volatile uint32_t g_hardfault_pc;
   extern volatile uint32_t g_hardfault_lr;
   g_hardfault_pc = hardfault_args[6];

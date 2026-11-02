@@ -1,4 +1,7 @@
 #include "screen.h"
+#include "screen_link.h"
+#include "system_wire.h"
+#include "system_state.h"
 #include "ui.h"
 #include "ui-myself.h"
 #include <math.h>
@@ -52,19 +55,14 @@ static uint16_t pulsation_pressure = 0;
 static uint16_t auto_pressure = 0;
 static uint8_t battery_percent = 0;
 static uint8_t battery_percent_valid = 0;
+static uint8_t system_sample_flags;
 static uint32_t software_version = 20241226UL;
 static uint8_t screen_start_ack = 0;
 static volatile uint8_t startup_language_received = 0U;
 static volatile uint8_t startup_language_preload_enabled = 1U;
 
 #define SCREEN_FAULT_STATUS_ID       0x2F01U
-#define SCREEN_FAULT_REPORT_TIMEOUT  5000U
-#define SCREEN_HEARTBEAT_TIMEOUT     2000U
 #define SCREEN_COMMUNICATION_FAULT   0x0501U
-#define SCREEN_TREATMENT_ACK_ID       0x00AEU
-#define SCREEN_TREATMENT_ACK_TIMEOUT  200U
-#define SCREEN_TREATMENT_ACK_SLOTS    4U
-#define SCREEN_PROTOCOL_MAX_FRAME     13U
 
 LV_FONT_DECLARE(ui_font_popup40);
 
@@ -76,113 +74,12 @@ typedef enum {
 } screen_popup_kind_t;
 
 static uint32_t active_fault_code = 0U;
-static uint32_t last_fault_report_ms = 0U;
 static uint32_t last_battery_heartbeat_ms = 0U;
 static uint8_t heartbeat_timer_started = 0U;
 static uint8_t eye_state_received = 0U;
 static screen_popup_kind_t displayed_popup = SCREEN_POPUP_NONE;
 static uint32_t displayed_fault_code = 0U;
 static uint8_t displayed_popup_language = 0xFFU;
-
-typedef struct {
-  uint8_t active;
-  uint8_t retry_count;
-  uint16_t command;
-  uint16_t frame_size;
-  uint32_t sent_at_ms;
-  uint8_t frame[SCREEN_PROTOCOL_MAX_FRAME];
-} screen_treatment_pending_t;
-
-static screen_treatment_pending_t
-    treatment_pending[SCREEN_TREATMENT_ACK_SLOTS];
-static uint32_t treatment_ack_timeout_count;
-static uint32_t treatment_ack_queue_full_count;
-
-static HAL_StatusTypeDef uart_transmit_raw(UART_HandleTypeDef *huart,
-                                           uint8_t *data, uint16_t size);
-
-static uint8_t treatment_command_requires_ack(uint16_t command)
-{
-  switch (command) {
-  case 0x1041U: /* prepare heating */
-  case 0x1005U: /* prepare pressure */
-  case 0x1037U: /* prepare automatic */
-  case 0x1040U: /* start heating */
-  case 0x1006U: /* start pressure */
-  case 0x1036U: /* start automatic */
-  case 0x1030U: /* stop heating */
-  case 0x1034U: /* stop pressure */
-  case 0x1038U: /* stop automatic */
-  case 0x8900U: /* natural treatment finish */
-    return 1U;
-  default:
-    return 0U;
-  }
-}
-
-static void treatment_ack_arm(uint16_t command, const uint8_t *frame,
-                              uint16_t frame_size)
-{
-  screen_treatment_pending_t *slot = NULL;
-
-  if (frame == NULL || frame_size > SCREEN_PROTOCOL_MAX_FRAME) {
-    return;
-  }
-  for (uint8_t index = 0U; index < SCREEN_TREATMENT_ACK_SLOTS; ++index) {
-    if (treatment_pending[index].active &&
-        treatment_pending[index].command == command) {
-      slot = &treatment_pending[index];
-      break;
-    }
-    if (slot == NULL && !treatment_pending[index].active) {
-      slot = &treatment_pending[index];
-    }
-  }
-  if (slot == NULL) {
-    treatment_ack_queue_full_count++;
-    return;
-  }
-
-  memcpy(slot->frame, frame, frame_size);
-  slot->active = 1U;
-  slot->retry_count = 0U;
-  slot->command = command;
-  slot->frame_size = frame_size;
-  slot->sent_at_ms = HAL_GetTick();
-}
-
-static void treatment_ack_received(uint16_t command)
-{
-  for (uint8_t index = 0U; index < SCREEN_TREATMENT_ACK_SLOTS; ++index) {
-    if (treatment_pending[index].active &&
-        treatment_pending[index].command == command) {
-      treatment_pending[index].active = 0U;
-      return;
-    }
-  }
-}
-
-void screen_treatment_ack_tick(void)
-{
-  uint32_t now = HAL_GetTick();
-
-  for (uint8_t index = 0U; index < SCREEN_TREATMENT_ACK_SLOTS; ++index) {
-    screen_treatment_pending_t *slot = &treatment_pending[index];
-
-    if (!slot->active ||
-        now - slot->sent_at_ms < SCREEN_TREATMENT_ACK_TIMEOUT) {
-      continue;
-    }
-    if (slot->retry_count == 0U) {
-      (void)uart_transmit_raw(&huart1, slot->frame, slot->frame_size);
-      slot->retry_count = 1U;
-      slot->sent_at_ms = now;
-    } else {
-      slot->active = 0U;
-      treatment_ack_timeout_count++;
-    }
-  }
-}
 
 void screen_preload_language_from_uart(const uint8_t *data, uint16_t size) {
   const uint16_t frame_size = (uint16_t)sizeof(prepare_data);
@@ -232,12 +129,7 @@ void screen_fault_popup_tick(void) {
     last_battery_heartbeat_ms = now;
   }
 
-  if (active_fault_code != 0U &&
-      now - last_fault_report_ms >= SCREEN_FAULT_REPORT_TIMEOUT) {
-    active_fault_code = 0U;
-  }
-
-  host_lost = (now - last_battery_heartbeat_ms >= SCREEN_HEARTBEAT_TIMEOUT);
+  host_lost = !ScreenLink_Healthy();
   if (eye_state_received && EYE_status == 0U) {
     wanted = SCREEN_POPUP_EYE_OFFLINE;
   } else if (active_fault_code == SCREEN_COMMUNICATION_FAULT) {
@@ -434,10 +326,14 @@ void screen_refresh_prepare_ui(void) {
 
 void screen_refresh_runtime_ui(void) {
   screen_refresh_prepare_ui();
-  set_temperature_label(ui_Label30, hot_temperature_tenths);
-  set_temperature_label(ui_Label39, auto_temperature_tenths);
-  set_pressure_label(ui_Label32, pulsation_pressure);
-  set_pressure_label(ui_Label46, auto_pressure);
+  if (system_sample_flags & 1U) set_temperature_label(ui_Label30, hot_temperature_tenths);
+  else if (ui_Label30) lv_label_set_text(ui_Label30, "--");
+  if (system_sample_flags & 1U) set_temperature_label(ui_Label39, auto_temperature_tenths);
+  else if (ui_Label39) lv_label_set_text(ui_Label39, "--");
+  if (system_sample_flags & 2U) set_pressure_label(ui_Label32, pulsation_pressure);
+  else if (ui_Label32) lv_label_set_text(ui_Label32, "--");
+  if (system_sample_flags & 2U) set_pressure_label(ui_Label46, auto_pressure);
+  else if (ui_Label46) lv_label_set_text(ui_Label46, "--");
   set_version_text();
 
   if (!battery_percent_valid) {
@@ -463,73 +359,23 @@ void screen_refresh_runtime_ui(void) {
 
 void screen_reset_hotting_runtime_ui(void) {
   hot_temperature_tenths = 0;
-  set_temperature_label(ui_Label30, hot_temperature_tenths);
+  if (system_sample_flags & 1U) set_temperature_label(ui_Label30, hot_temperature_tenths);
+  else if (ui_Label30) lv_label_set_text(ui_Label30, "--");
 }
 
 void screen_reset_pulsationning_runtime_ui(void) {
   pulsation_pressure = 0;
-  set_pressure_label(ui_Label32, pulsation_pressure);
+  if (system_sample_flags & 2U) set_pressure_label(ui_Label32, pulsation_pressure);
+  else if (ui_Label32) lv_label_set_text(ui_Label32, "--");
 }
 
 void screen_reset_autoing_runtime_ui(void) {
   auto_temperature_tenths = 0;
   auto_pressure = 0;
-  set_temperature_label(ui_Label39, auto_temperature_tenths);
-  set_pressure_label(ui_Label46, auto_pressure);
-}
-
-void work_flinsh(void) {
-  if (work_finish) {
-	work_finish=0;
-    HAL_TIM_Base_Stop_IT(&htim14);
-    if (work_mode != 0) {
-      static AXI_SRAM CTRL_MSG pData_time_finish;
-      pData_time_finish.cmd_head_high = 0x5A;
-      pData_time_finish.cmd_head_low = 0xA5;
-      pData_time_finish.frame_length = 0x0d;
-      pData_time_finish.cmd_type_high = 0x89;
-      pData_time_finish.cmd_type_low = 0x00;
-      pData_time_finish.data = 1.0;
-      pData_time_finish.crc = Calculate_CRC((uint8_t *)&pData_time_finish,
-                                            sizeof(pData_time_finish) - 4);
-      pData_time_finish.end_high = 0xFF;
-      pData_time_finish.end_low = 0xFF;
-      UART_TransmitWithRetry(&huart1, (uint8_t *)&pData_time_finish,
-                             sizeof(pData_time_finish));
-      static AXI_SRAM CTRL_MSG pData;
-      pData.cmd_head_high = 0x5A;
-      pData.cmd_head_low = 0xA5;
-      pData.frame_length = 0x0d;
-      pData.cmd_type_high = 0x10;
-      // 根据工作模式发送不同的命令
-      switch (work_mode) {
-      case 1:
-        lv_obj_clear_flag(ui_Image53,
-                          LV_OBJ_FLAG_HIDDEN); // 显示工作模式1相关UI元素
-        lv_obj_clear_flag(ui_Container3, LV_OBJ_FLAG_HIDDEN);
-        pData.cmd_type_low = 0x30;
-        break;
-      case 2:
-        lv_obj_clear_flag(ui_Image56,
-                          LV_OBJ_FLAG_HIDDEN); // 显示工作模式2相关UI元素
-        lv_obj_clear_flag(ui_Container5, LV_OBJ_FLAG_HIDDEN);
-        pData.cmd_type_low = 0x34;
-        break;
-      case 3:
-        lv_obj_clear_flag(ui_Image57,
-                          LV_OBJ_FLAG_HIDDEN); // 显示工作模式3相关UI元素
-        lv_obj_clear_flag(ui_Container8, LV_OBJ_FLAG_HIDDEN);
-        pData.cmd_type_low = 0x38;
-        break;
-      default:
-        break;
-      }
-      pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-      pData.end_high = 0xFF;
-      pData.end_low = 0xFF;
-      UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-    }
-  }
+  if (system_sample_flags & 1U) set_temperature_label(ui_Label39, auto_temperature_tenths);
+  else if (ui_Label39) lv_label_set_text(ui_Label39, "--");
+  if (system_sample_flags & 2U) set_pressure_label(ui_Label46, auto_pressure);
+  else if (ui_Label46) lv_label_set_text(ui_Label46, "--");
 }
 
 void command_parsing(
@@ -567,8 +413,6 @@ void command_parsing(
 }
 
 void processData(PCTRL_MSG msg) {
-  uint16_t cmd_head = ((msg->cmd_head_high) << 8) |
-                      (msg->cmd_head_low); // 将两�??8位值合并成一�??16位�?
   uint16_t cmd_type = ((msg->cmd_type_high) << 8) |
                       (msg->cmd_type_low); // 将两�??8位值合并成一�??16位�?
   // uint16_t data = ((msg->data_high) << 8) | (msg->data_low); // 指令类型
@@ -598,62 +442,10 @@ void processData(PCTRL_MSG msg) {
     heartbeat_timer_started = 1U;
     screen_refresh_runtime_ui();
     break;
-  case 0x2051: // 主机发送停�??            
-    HAL_TIM_Base_Stop_IT(&htim14);
-    switch (work_mode) {
-    case 1: // �??敷状态下点击的停�??
-      lv_obj_clear_flag(ui_Image53, LV_OBJ_FLAG_HIDDEN);     // 打开阴影
-      lv_obj_clear_flag(ui_Container10, LV_OBJ_FLAG_HIDDEN); // 打开阴影//3
-      break;
-    case 2: // 脉动状态下点击的停�??
-      lv_obj_clear_flag(ui_Image56, LV_OBJ_FLAG_HIDDEN);    // 打开阴影
-      lv_obj_clear_flag(ui_Container4, LV_OBJ_FLAG_HIDDEN); // 打开阴影//5
-      break;
-    case 3: // �??动状态下点击的停�??
-      lv_obj_clear_flag(ui_Image57, LV_OBJ_FLAG_HIDDEN);    // 打开阴影
-      lv_obj_clear_flag(ui_Container7, LV_OBJ_FLAG_HIDDEN); // 打开阴影//8
-      break;
-
-    default:
-      break;
-    }
-    work_mode = 0;
-    break;
-		case 0x2056: // 眼盾拔出主机发送停          
-    HAL_TIM_Base_Stop_IT(&htim14);
-		break;
-		case 0x2057: // 检测新眼盾 
-		{lv_obj_t * current_screen1 = lv_scr_act();
-    // 这些界面不创建 global_panel
-    if (!(current_screen1 == ui_home_page ) )
-		{
-			_ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
-    }		}
-		break;
-  case 0x2052: // 主机发送开�??
-    HAL_TIM_Base_Start_IT(&htim14);
-    switch (work_mode) {
-    case 1: // �??敷状态下点击的停�??
-      lv_obj_add_flag(ui_Image70,
-                      LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
-      lv_obj_add_flag(ui_Image5, LV_OBJ_FLAG_CLICKABLE);
-      break;
-    case 2: // 脉动状态下点击的停�??
-      lv_obj_add_flag(ui_Image74,
-                      LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
-      lv_obj_add_flag(ui_Image22, LV_OBJ_FLAG_CLICKABLE);
-      break;
-    case 3: // �??动状态下点击的停�??
-      lv_obj_add_flag(ui_Image75,
-                      LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_ADV_HITTEST); /// 隐藏
-      lv_obj_add_flag(ui_Image55, LV_OBJ_FLAG_CLICKABLE);
-      break;
-
-    default:
-      break;
-    }
-
-    break;
+  case 0x2051: return; /* Versioned snapshot owns treatment UI. */
+		case 0x2056: return;
+  case 0x2057: return; /* Insertion is part of the snapshot. */
+  case 0x2052: return;
   case 0x2053: // 在充�??
     lv_obj_set_style_bg_img_recolor(ui_Slider1, lv_color_hex(0x4FCD51),
                                     LV_PART_INDICATOR | LV_STATE_DEFAULT);
@@ -666,18 +458,7 @@ void processData(PCTRL_MSG msg) {
     lv_obj_set_style_bg_img_recolor_opa(ui_Slider1, 00,
                                         LV_PART_INDICATOR | LV_STATE_DEFAULT);
     break;
-  case 0x2055:
-    EYE_status = (data == 1.0f) ? 1U : 0U;
-    eye_state_received = 1U;
-    if (EYE_status == 0U) {
-      if (lv_scr_act() != ui_home_page) {
-        _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0,
-                          &ui_home_page_screen_init);
-      }
-      work_mode = 0;
-    }
-    screen_fault_popup_tick();
-    break;
+  case 0x2055: return; /* Eye validity is part of the snapshot. */
   default:
     break;
   }
@@ -692,18 +473,13 @@ void processData_u32(PCTRL_MSG_U32 msg) {
     screen_refresh_runtime_ui();
     break;
   case SCREEN_FAULT_STATUS_ID:
-    active_fault_code = msg->value;
-    last_fault_report_ms = HAL_GetTick();
-    screen_fault_popup_tick();
-    break;
+    return; /* Versioned state snapshot owns fault status. */
   default:
     break;
   }
 }
 
 void processData_prepare(prepare_data_p msg) {
-  uint16_t cmd_head = ((msg->cmd_head_high) << 8) |
-                      (msg->cmd_head_low); // 将两�??8位值合并成一�??16位�?
   uint16_t cmd_type = ((msg->cmd_type_high) << 8) |
                       (msg->cmd_type_low); // 将两�??8位值合并成一�??16位�?
   // uint16_t data = ((msg->data_high) << 8) | (msg->data_low); // 指令类型
@@ -814,9 +590,6 @@ void processData_prepare(prepare_data_p msg) {
     if (data == 1U) {
       screen_start_ack = 1U;
     }
-    break;
-  case SCREEN_TREATMENT_ACK_ID:
-    treatment_ack_received(data);
     break;
   default:
     break;
@@ -1069,16 +842,15 @@ static HAL_StatusTypeDef uart_transmit_raw(UART_HandleTypeDef *huart,
 HAL_StatusTypeDef UART_TransmitWithRetry(UART_HandleTypeDef *huart,
                                          uint8_t *data, uint16_t size)
 {
-  HAL_StatusTypeDef status = uart_transmit_raw(huart, data, size);
-
-  if (status == HAL_OK && size >= 5U && data[0] == 0x5AU &&
-      data[1] == 0xA5U) {
-    uint16_t command = (uint16_t)((uint16_t)data[3] << 8U) | data[4];
-    if (treatment_command_requires_ack(command)) {
-      treatment_ack_arm(command, data, size);
+  if (size == 13U && data[0] == 0x5a && data[1] == 0xa5) {
+    uint16_t cmd = ((uint16_t)data[3] << 8) | data[4];
+    if (ScreenLink_IsTreatmentCommand(cmd)) {
+      extern int minutes;
+      float value; memcpy(&value, data + 5, 4);
+      return ScreenLink_Request(cmd, value, (uint16_t)(minutes * 60)) ? HAL_OK : HAL_ERROR;
     }
   }
-  return status;
+  return uart_transmit_raw(huart, data, size);
 }
 
 void screenstart(void) {
@@ -1106,4 +878,104 @@ void screenack(void) {
   pData.end_high = 0xFF;
   pData.end_low = 0xFF;
   UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
+}
+
+/* State rendering is idempotent: a repeated snapshot cannot start a timer,
+ * send a command, consume an eye shield or increment a treatment counter. */
+void screen_apply_system_state(const uint8_t *p, bool pending, uint8_t result)
+{
+  extern int minutes, seconds;
+  static lv_obj_t *request_label;
+  static uint8_t last_mode;
+  const uint8_t state = p[12], mode = p[13];
+  system_sample_flags = p[15];
+  EYE_status = (p[14] == APP_EYE_NEW || p[14] == APP_EYE_IN_USE || p[14] == APP_EYE_SERVICE);
+  eye_state_received = 1U;
+  battery_percent = p[34]; battery_percent_valid = 1;
+  hot_temperature_tenths = auto_temperature_tenths = (int16_t)Sw_Get16(p + 38) / 10;
+  pulsation_pressure = auto_pressure = Sw_Get16(p + 26) / 10U;
+  const bool open = state == APP_STATE_PREHEAT || state == APP_STATE_READY || state == APP_STATE_RUNNING;
+  const bool running = state == APP_STATE_RUNNING;
+  HAL_TIM_Base_Stop_IT(&htim14);
+  active_fault_code = Sw_Get16(p + 16);
+  if (request_label == NULL) {
+    request_label = lv_label_create(lv_layer_top());
+    lv_obj_set_style_text_font(request_label, &ui_font_popup40, 0);
+    lv_obj_align(request_label, LV_ALIGN_BOTTOM_MID, 0, -8);
+  }
+  /* Use only glyphs included in popup40; the former arbitrary text rendered
+   * missing-glyph boxes on the embedded build. */
+  const char *text = pending ? "..." : result == SW_OK ? "" :
+      result == SW_STALE ? "请返回首页" : result == SW_NO_LINK ? "请检查主机连接" : "失败 请检查主机";
+  if (ui_lang_get() == UI_LANG_EN) {
+    text = pending ? "Please wait..." : result == SW_OK ? "" :
+        result == SW_STALE ? "State changed" : result == SW_NO_LINK ? "Check link" : "Request rejected";
+  }
+  lv_label_set_text(request_label, text);
+  if (open && mode >= 1 && mode <= 3) {
+    if (mode == 1 && lv_scr_act() != ui_hotting)
+      _ui_screen_change(&ui_hotting, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_hotting_screen_init);
+    if (mode == 2 && lv_scr_act() != ui_pulsationning)
+      _ui_screen_change(&ui_pulsationning, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_pulsationning_screen_init);
+    if (mode == 3 && lv_scr_act() != ui_autoing)
+      _ui_screen_change(&ui_autoing, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_autoing_screen_init);
+    work_mode = mode; last_mode = mode;
+    lv_obj_t *start = mode == 1 ? ui_Image70 : mode == 2 ? ui_Image74 : ui_Image75;
+    lv_obj_t *stop = mode == 1 ? ui_Image5 : mode == 2 ? ui_Image22 : ui_Image55;
+    lv_obj_t *shade = mode == 1 ? ui_Image53 : mode == 2 ? ui_Image56 : ui_Image57;
+    lv_obj_t *manual = mode == 1 ? ui_Container10 : mode == 2 ? ui_Container4 : ui_Container7;
+    lv_obj_t *natural = mode == 1 ? ui_Container3 : mode == 2 ? ui_Container5 : ui_Container8;
+    lv_obj_add_flag(shade, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(manual, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(natural, LV_OBJ_FLAG_HIDDEN);
+    if (running) lv_obj_add_flag(start, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_clear_flag(start, LV_OBJ_FLAG_HIDDEN);
+    if (pending) lv_obj_clear_flag(start, LV_OBJ_FLAG_CLICKABLE);
+    else lv_obj_add_flag(start, LV_OBJ_FLAG_CLICKABLE);
+    if (running) lv_obj_add_flag(stop, LV_OBJ_FLAG_CLICKABLE);
+    else lv_obj_clear_flag(stop, LV_OBJ_FLAG_CLICKABLE);
+    uint32_t total_s = (Sw_Get32(p + 20) + 999U) / 1000U;
+    minutes = (int)(total_s / 60U); seconds = (int)(total_s % 60U);
+    lv_obj_t *min_label = mode == 1 ? ui_cut_d_l11 : mode == 2 ? ui_cut_d_l21 : ui_cut_d_l31;
+    lv_obj_t *sec_label = mode == 1 ? ui_cut_d_l12 : mode == 2 ? ui_cut_d_l22 : ui_cut_d_l32;
+    lv_label_set_text_fmt(min_label, "%02d", minutes);
+    lv_label_set_text_fmt(sec_label, "%02d", seconds);
+  } else {
+    work_mode = 0;
+    if (last_mode) {
+      bool current = (last_mode == 1 && lv_scr_act() == ui_hotting) ||
+                     (last_mode == 2 && lv_scr_act() == ui_pulsationning) ||
+                     (last_mode == 3 && lv_scr_act() == ui_autoing);
+      if (current) {
+        minutes = seconds = 0;
+        lv_label_set_text(last_mode == 1 ? ui_cut_d_l11 : last_mode == 2 ? ui_cut_d_l21 : ui_cut_d_l31, "00");
+        lv_label_set_text(last_mode == 1 ? ui_cut_d_l12 : last_mode == 2 ? ui_cut_d_l22 : ui_cut_d_l32, "00");
+        lv_obj_t *shade = last_mode == 1 ? ui_Image53 : last_mode == 2 ? ui_Image56 : ui_Image57;
+        lv_obj_t *manual = last_mode == 1 ? ui_Container10 : last_mode == 2 ? ui_Container4 : ui_Container7;
+        lv_obj_t *natural = last_mode == 1 ? ui_Container3 : last_mode == 2 ? ui_Container5 : ui_Container8;
+        lv_obj_clear_flag(shade, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(manual, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(natural, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(p[18] == APP_STOP_NATURAL ? natural : manual, LV_OBJ_FLAG_HIDDEN);
+      }
+    } else if (result != SW_OK && !pending && (lv_scr_act() == ui_hotting ||
+               lv_scr_act() == ui_pulsationning || lv_scr_act() == ui_autoing)) {
+      _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
+    }
+  }
+  screen_fault_popup_tick();
+}
+
+void screen_config_saved(void)
+{
+  extern uint32_t save_picture_time;
+  if (ui_Image107) lv_obj_clear_flag(ui_Image107, LV_OBJ_FLAG_HIDDEN);
+  save_picture_time = HAL_GetTick();
+}
+
+void screen_system_link_lost(void)
+{
+  system_sample_flags = 0;
+  HAL_TIM_Base_Stop_IT(&htim14);
+  screen_fault_popup_tick();
 }

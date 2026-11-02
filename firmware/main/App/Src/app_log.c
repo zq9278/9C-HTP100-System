@@ -13,6 +13,17 @@
 
 static char g_log_buffer[APP_LOG_BUFFER_SIZE];
 static bool g_log_busy;
+static char tx_ring[2048];
+static size_t tx_write, tx_read;
+volatile uint32_t g_log_dropped_records, g_log_tx_errors;
+void AppLog_Tick(void)
+{
+    size_t available = tx_write >= tx_read ? tx_write - tx_read : sizeof(tx_ring) - tx_read;
+    if (available > 32U) available = 32U;
+    if (!available) return;
+    if (HAL_UART_Transmit(&huart1, (uint8_t *)&tx_ring[tx_read], (uint16_t)available, 4U) != HAL_OK) g_log_tx_errors++;
+    tx_read = (tx_read + available) % sizeof(tx_ring);
+}
 
 void AppLog_Init(void)
 {
@@ -27,8 +38,11 @@ void AppLog_WriteRaw(const char *data, size_t length)
     if (length > UINT16_MAX) {
         length = UINT16_MAX;
     }
-    (void)HAL_UART_Transmit(&huart1, (const uint8_t *)data, (uint16_t)length,
-                            APP_LOG_UART_TIMEOUT_MS);
+    size_t free_bytes = (tx_read + sizeof(tx_ring) - tx_write - 1U) % sizeof(tx_ring);
+    if (length > free_bytes) { g_log_dropped_records++; return; }
+    for (size_t i = 0; i < length; ++i) {
+        tx_ring[tx_write] = data[i]; tx_write = (tx_write + 1U) % sizeof(tx_ring);
+    }
 }
 
 void AppLog_Write(const char *level, const char *format, ...)

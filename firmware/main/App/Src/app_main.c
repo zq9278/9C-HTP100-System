@@ -1,4 +1,8 @@
 #include "app_main.h"
+#include "system_link.h"
+#include "rtt_tuning.h"
+#include "safety_monitor.h"
+#include "treatment_hw.h"
 
 #include "FreeRTOS.h"
 #include "app_config.h"
@@ -69,8 +73,13 @@ void AppMain_Task(void *argument)
     ScreenProtocol_Init(Board_ScreenWrite);
     /* The tuning protocol shares USART2 with the real screen. Its 7A A7
      * header is deliberately distinct from the screen's 5A A5 / 6A A6. */
+#if APP_ENABLE_SERVICE_PROTOCOL
     TuningProtocol_Init(Board_ScreenWrite);
+#endif
+    SafetyMonitor_Init();
     AppController_Init(Board_AppPort());
+    SystemLink_Init();
+    RttTuning_Init();
     /* Make the first charger check immediate instead of leaving a one-second
      * window in which PWR_SENSE can be mistaken for a battery-only shutdown. */
     last_power_ms = HAL_GetTick() - APP_BATTERY_POLL_PERIOD_MS;
@@ -79,9 +88,14 @@ void AppMain_Task(void *argument)
         uint32_t now = HAL_GetTick();
         size_t received = Board_ScreenRead(serial_data, sizeof(serial_data));
         if (received != 0U) {
+            SystemLink_Feed(serial_data, received);
             ScreenProtocol_Feed(serial_data, received);
+#if APP_ENABLE_SERVICE_PROTOCOL
             TuningProtocol_Feed(serial_data, received);
+#endif
         }
+        SystemLink_Tick();
+        if (SafetyMonitor_Tripped()) AppController_RaiseFault(APP_FAULT_CONTROL_STALE);
         if (Board_TakeButtonEvent()) {
             handle_button();
         }
@@ -125,9 +139,15 @@ void AppMain_Task(void *argument)
             AppController_NotifyPowerLoss();
         }
         AppController_Tick();
+#if APP_ENABLE_SERVICE_PROTOCOL
         TuningProtocol_Tick();
+#endif
         Board_Tick();
         EyeDriver_DiagnosticsTick();
+        SystemLink_Tick();
+        RttTuning_Tick();
+        AppLog_Tick();
+        SafetyMonitor_Service(TreatmentHw_OutputsActive());
         vTaskDelay(pdMS_TO_TICKS(10U));
     }
 }

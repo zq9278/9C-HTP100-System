@@ -1,0 +1,15 @@
+.cache/
+**/build/
+**/build_old/
+**/node_modules/
+**/__pycache__/
+*.log
+*.o
+*.elf
+*.hex
+*.bin
+*.map
+*.pyc
+
+**/.venv/
+out/

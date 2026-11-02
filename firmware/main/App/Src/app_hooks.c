@@ -1,5 +1,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
+#include "safety_monitor.h"
 
 volatile const char *g_assert_file;
 volatile int g_assert_line;
@@ -12,6 +13,7 @@ void vAssertCalled(const char *file, int line)
 {
     g_assert_file = file;
     g_assert_line = line;
+    SafetyMonitor_EmergencyOff();
     taskDISABLE_INTERRUPTS();
     for (;;) { }
 }
@@ -20,12 +22,14 @@ void vApplicationStackOverflowHook(TaskHandle_t task, char *task_name)
 {
     g_stack_overflow_task = task;
     g_stack_overflow_name = task_name;
+    SafetyMonitor_EmergencyOff();
     taskDISABLE_INTERRUPTS();
     for (;;) { }
 }
 
 void vApplicationMallocFailedHook(void)
 {
+    SafetyMonitor_EmergencyOff();
     taskDISABLE_INTERRUPTS();
     for (;;) { }
 }

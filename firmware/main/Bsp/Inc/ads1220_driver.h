@@ -9,7 +9,8 @@ typedef enum {
     ADS1220_RESULT_COMM,
     ADS1220_RESULT_SENSOR_SHORT,
     ADS1220_RESULT_SENSOR_OPEN,
-    ADS1220_RESULT_ZERO_UNSTABLE
+    ADS1220_RESULT_ZERO_UNSTABLE,
+    ADS1220_RESULT_BUSY
 } Ads1220Result;
 
 void Ads1220Driver_PreparePins(void);
@@ -18,7 +19,7 @@ bool Ads1220Driver_RetryInit(void);
 bool Ads1220Driver_Ready(void);
 bool Ads1220Driver_ReadRaw(int32_t *raw);
 Ads1220Result Ads1220Driver_CheckSensor(void);
-Ads1220Result Ads1220Driver_ZeroCalibrate(void);
+Ads1220Result Ads1220Driver_ZeroPoll(bool begin);
 bool Ads1220Driver_ZeroValid(void);
 int32_t Ads1220Driver_ZeroRaw(void);
 float Ads1220Driver_PressureFromRaw(int32_t raw, float target_mmhg);

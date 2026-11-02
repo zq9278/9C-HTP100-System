@@ -43,34 +43,39 @@ static bool board_eye_mark_consumed(void)
     return true;
 }
 
-static AppFault board_pressure_zero_calibrate(void)
+static AppAsyncResult board_pressure_zero_poll(bool begin, AppFault *fault)
 {
+    static uint8_t attempt;
+    static bool retry_wait;
+    static uint32_t failed_at;
     Ads1220Result result;
-
-    if (!Ads1220Driver_Ready() && !Ads1220Driver_Init()) {
-        LOGE("[ADS1220] Zero calibration skipped: ADC initialization unavailable");
-        return APP_FAULT_PRESSURE_COMM;
+    if (begin) { attempt = 1U; retry_wait = false; }
+    if (retry_wait) {
+        if (HAL_GetTick() - failed_at < APP_PRESSURE_ZERO_RETRY_MS) return APP_ASYNC_BUSY;
+        retry_wait = false;
+        begin = true;
     }
-    g_ads_ready = true;
-    for (uint8_t attempt = 1U; attempt <= APP_PRESSURE_ZERO_TRIES; ++attempt) {
-        result = Ads1220Driver_ZeroCalibrate();
-        if (result == ADS1220_RESULT_OK) break;
-        LOGW("[ADS1220] Zero attempt=%u/%u failed result=%u",
-             (unsigned)attempt, (unsigned)APP_PRESSURE_ZERO_TRIES,
-             (unsigned)result);
-        if (attempt < APP_PRESSURE_ZERO_TRIES) {
-            vTaskDelay(pdMS_TO_TICKS(APP_PRESSURE_ZERO_RETRY_MS));
-        }
-    }
+    result = Ads1220Driver_ZeroPoll(begin);
+    if (result == ADS1220_RESULT_BUSY) return APP_ASYNC_BUSY;
     if (result == ADS1220_RESULT_OK) {
-        return APP_FAULT_NONE;
+        *fault = APP_FAULT_NONE;
+        return APP_ASYNC_OK;
+    }
+    LOGW("[ADS1220] Zero attempt=%u/%u failed result=%u", (unsigned)attempt,
+         (unsigned)APP_PRESSURE_ZERO_TRIES, (unsigned)result);
+    if (attempt++ < APP_PRESSURE_ZERO_TRIES) {
+        retry_wait = true;
+        failed_at = HAL_GetTick();
+        return APP_ASYNC_BUSY;
     }
     if (result == ADS1220_RESULT_SENSOR_SHORT ||
         result == ADS1220_RESULT_SENSOR_OPEN) {
-        return APP_FAULT_PRESSURE_SENSOR;
+        *fault = APP_FAULT_PRESSURE_SENSOR;
+    } else {
+        *fault = result == ADS1220_RESULT_ZERO_UNSTABLE ?
+                 APP_FAULT_PRESSURE_ZERO : APP_FAULT_PRESSURE_COMM;
     }
-    return result == ADS1220_RESULT_ZERO_UNSTABLE ?
-           APP_FAULT_PRESSURE_ZERO : APP_FAULT_PRESSURE_COMM;
+    return APP_ASYNC_FAILED;
 }
 
 static bool board_power_read(bool *charging, bool *full, uint16_t *soc,
@@ -135,7 +140,7 @@ static const AppPort g_port = {
     .home_begin = TreatmentHw_HomeBegin,
     .home_poll = TreatmentHw_HomePoll,
     .home_cancel = TreatmentHw_HomeCancel,
-    .pressure_zero_calibrate = board_pressure_zero_calibrate,
+    .pressure_zero_poll = board_pressure_zero_poll,
     .eye_read_state = EyeDriver_ReadState,
     .eye_mark_consumed = board_eye_mark_consumed,
     .power_read = board_power_read,
@@ -150,7 +155,9 @@ static const AppPort g_port = {
     .screen_float = ScreenProtocol_SendFloat,
     .screen_u16 = ScreenProtocol_SendU16,
     .screen_u32 = ScreenProtocol_SendU32,
-    .fault_report = board_fault_report
+    .fault_report = board_fault_report,
+    .pressure_sample_valid = TreatmentHw_PressureSampleValid,
+    .save_preset = StorageDriver_SavePreset
 };
 
 bool Board_Init(void)

@@ -137,3 +137,7 @@ if(CMAKE_OBJCOPY)
         ${HEX_OUTPUT_FILE}
     )
 endif()
+
+# Shared, HAL-independent wire contract. Both images must use the same revision.
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/protocol/system_wire.c)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../shared/protocol)

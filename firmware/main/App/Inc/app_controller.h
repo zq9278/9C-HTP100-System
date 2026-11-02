@@ -5,9 +5,11 @@
 
 void AppController_Init(const AppPort *port);
 void AppController_Tick(void);
+void AppController_SetScreenLinkHealthy(bool healthy);
 
 bool AppController_Prepare(AppMode mode, float pressure_mmhg);
 bool AppController_Start(void);
+bool AppController_SavePreset(uint8_t preset, uint16_t pressure, uint16_t minutes);
 void AppController_Stop(AppStopReason reason);
 void AppController_RaiseFault(AppFault fault);
 void AppController_SetEyeState(AppEyeState eye);

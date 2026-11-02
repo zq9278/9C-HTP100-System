@@ -3,7 +3,7 @@
 
 /* Product identity. PRODUCT_VERSION_NUMBER is sent to the LCD and tuning host. */
 #define PRODUCT_MODEL_NAME          "9C-HTP100"
-#define PRODUCT_VERSION_NUMBER      20261024UL
+#define PRODUCT_VERSION_NUMBER      20261102UL
 
 /* Add this value to the heater control setpoint and subtract it from the LCD's
  * measured-temperature display. Safety checks and tuning-host telemetry keep
@@ -13,7 +13,7 @@
 /* Reset the complete main-board I2C EEPROM once after each firmware download.
  * Ordinary power cycles and software resets preserve the EEPROM. */
 #ifndef PRODUCT_MAIN_EEPROM_RESET_AFTER_PROGRAM
-#define PRODUCT_MAIN_EEPROM_RESET_AFTER_PROGRAM  1U
+#define PRODUCT_MAIN_EEPROM_RESET_AFTER_PROGRAM  0U
 #endif
 
 #if PRODUCT_MAIN_EEPROM_RESET_AFTER_PROGRAM != 0U && \

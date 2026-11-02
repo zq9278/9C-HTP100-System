@@ -1,4 +1,5 @@
 #include "treatment_hw.h"
+#include "pressure_motion.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -21,10 +22,7 @@ typedef enum {
 
 #define PRESSURE_FILTER_ALPHA          0.20f
 #define PRESSURE_CONTROL_DEADBAND      3.0f
-#define PRESSURE_CONTROL_MAX_SPEED     8000.0f
-#define PRESSURE_CONTROL_MAX_I_OUTPUT  2000.0f
 #define PRESSURE_CONTROL_SLEW_PER_S    100000.0f
-#define PRESSURE_CONTROL_MIN_SPEED     300.0f
 #define PRESSURE_P_SWITCH_RATIO        0.5f
 #define PRESSURE_RETRACT_CONFIRM_SAMPLES 3U
 #define PRESSURE_HOLD_TIME_MS          1000U
@@ -49,7 +47,6 @@ typedef enum {
 #define HEAT_PID_MAX_I_OUT  40.0f
 #define HEAT_PID_MIN_I_OUT  (-40.0f)
 
-const volatile float g_pressure_p_speed_limit = 60000.0f;
 
 static bool g_home_active;
 static uint32_t g_home_started_ms;
@@ -60,7 +57,9 @@ static bool g_home_stop_requested;
 static bool g_home_confirming;
 static uint32_t g_home_confirm_started_ms;
 static bool g_home_low_confirming;
+#if APP_HOME_LOW_PRESSURE_SUCCESS
 static uint32_t g_home_low_started_ms;
+#endif
 static uint32_t g_home_low_sample_ms;
 static float g_home_pressure_target = 350.0f;
 static bool g_home_recovering;
@@ -83,6 +82,7 @@ static uint32_t g_pressure_last_tmc_probe_ms;
 static uint32_t g_pressure_last_sensor_check_ms;
 static float g_pressure_integral;
 static float g_pressure_command;
+static uint32_t g_command_ms;
 static float g_pressure_error;
 static float g_pressure_filter_samples[3];
 static float g_pressure_filtered;
@@ -106,6 +106,7 @@ static float g_heat_kd;
 static float g_heat_power_percent;
 static bool g_heat_previous_valid;
 static bool g_heat_pwm_started;
+static uint32_t g_heat_sample_ms;
 
 static AppFault pressure_begin_recovery(const char *reason);
 static AppFault pressure_recovery_poll(float target_mmhg,
@@ -183,6 +184,10 @@ static void pressure_control_reset(void)
 
 static bool pressure_set_speed(float command)
 {
+    uint32_t now = HAL_GetTick();
+    float dt = fminf((float)(now - g_command_ms) / 1000.0f, 0.1f);
+    command = PressureMotion_Slew(g_pressure_command, command, dt, PRESSURE_CONTROL_SLEW_PER_S);
+    g_command_ms = now;
     int32_t speed = (int32_t)command;
 
     if (!Tmc5130Driver_SetSpeed(speed)) return false;
@@ -199,9 +204,18 @@ static float pressure_control_command(const PressureTuningProfile *profile,
     if (use_deadband && fabsf(error) <= PRESSURE_CONTROL_DEADBAND)
         return 0.0f;
     /* Pure P velocity control; allow both compression and unloading. */
-    const float limit = g_pressure_p_speed_limit; /* Internal P-control output limit. */
-    return clamp_float(profile->kp * error, -limit, limit);
+    float target = g_home_pressure_target;
+    return PressureMotion_Command(target, target - error, profile->fast_speed,
+                                  profile->retract_speed, profile->kp,
+                                  profile->approach_ratio, use_deadband);
 }
+
+bool TreatmentHw_PressureSampleValid(void)
+{
+    return g_ads_sample_valid && g_pressure_active && !g_pressure_recovering;
+}
+
+bool TreatmentHw_OutputsActive(void) { return g_home_active || g_pressure_active || g_heat_power_percent > 0.0f; }
 
 void TreatmentHw_Init(void)
 {
@@ -239,10 +253,24 @@ bool TreatmentHw_HeaterControl(float target_c, float *measured_c)
     float integral_output;
     float pwm;
 
-    if (!EyeDriver_ReadTemperature(measured_c)) {
-        /* Keep the previous PWM and controller state during the application's
-         * bounded temperature-communication confirmation window. */
+    if (!isfinite(target_c) || target_c <= 0.0f ||
+        !EyeDriver_ReadTemperature(measured_c) || !isfinite(*measured_c) || *measured_c <= 0.0f) {
+        __HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 0U);
+        g_heat_power_percent = 0.0f;
+        g_heat_integral = 0.0f;
+        g_heat_previous_valid = false;
         return false;
+    }
+    uint32_t sample_ms = HAL_GetTick();
+    float dt = g_heat_previous_valid ? (float)(sample_ms - g_heat_sample_ms) / 1000.0f : HEAT_PID_DT_S;
+    g_heat_sample_ms = sample_ms;
+    dt = clamp_float(dt, 0.01f, 0.5f);
+    if (*measured_c >= APP_MAX_SAFE_TEMPERATURE_C) {
+        __HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, 0U);
+        g_heat_power_percent = 0.0f;
+        g_heat_integral = 0.0f;
+        g_heat_previous_valid = false;
+        return true; /* Valid overtemperature: application confirms the alarm. */
     }
     error = target_c - *measured_c;
     /* Temporarily disabled for PID tuning: reaching the target must not
@@ -255,8 +283,8 @@ bool TreatmentHw_HeaterControl(float target_c, float *measured_c)
      * } else
      */
     derivative = g_heat_previous_valid ?
-                 (error - g_heat_previous_error) / HEAT_PID_DT_S : 0.0f;
-    next_integral = g_heat_integral + error * HEAT_PID_DT_S;
+                 (error - g_heat_previous_error) / dt : 0.0f;
+    next_integral = g_heat_integral + error * dt;
     if (next_integral > HEAT_PID_MAX_I) next_integral = HEAT_PID_MAX_I;
     if (next_integral < HEAT_PID_MIN_I) next_integral = HEAT_PID_MIN_I;
     integral_output = g_heat_ki * next_integral;
@@ -328,7 +356,7 @@ static bool home_configure_driver(bool verify)
            Tmc5130Driver_Read(0x35U, &previous_status) == HAL_OK &&
            /* REFR high active, positive-direction hard stop, edge latch. */
            Tmc5130Driver_Write(0x34U, 0x82U) == HAL_OK &&
-           Tmc5130Driver_Write(0x27U, 0x00010000U) == HAL_OK &&
+           Tmc5130Driver_Write(0x27U, 0x0000FFFFU) == HAL_OK &&
            Tmc5130Driver_Write(0x20U, 1U) == HAL_OK;
 }
 
@@ -570,7 +598,6 @@ bool TreatmentHw_PressureStart(float target_mmhg)
     if (!Ads1220Driver_ZeroValid()) {
         return false;
     }
-    Tmc5130Driver_Enable(true);
     if (!Tmc5130Driver_Configure()) {
         Tmc5130Driver_Enable(false);
         return false;
@@ -588,6 +615,7 @@ bool TreatmentHw_PressureStart(float target_mmhg)
     pressure_filter_reset();
     g_ads_sample_valid = false;
     g_pressure_active = true;
+    Tmc5130Driver_Enable(true); /* Configure leaves VMAX=0 until a fresh sample. */
     LOG_PRESSURE_DIAG("[Pressure] Start target=%ldmmHg stage=fast",
          (long)target_mmhg);
     LOG_PRESSURE_DIAG("[Pressure] P profile kp=%ld", (long)profile->kp);
@@ -659,6 +687,8 @@ static AppFault pressure_step_once(float target_mmhg, float *measured_mmhg)
     bool overpressure_confirmed = PressureLimit_Update(
         &g_overpressure, unfiltered_pressure, HAL_GetTick());
     if (unfiltered_pressure >= APP_MAX_SAFE_PRESSURE_MMHG) {
+        /* Gate motion immediately; alarm confirmation must never retain forward speed. */
+        if (!pressure_set_speed(0.0f)) return pressure_begin_recovery("overpressure stop failed");
         g_pressure_retract_low_samples = 0U;
         if (!was_overpressure_timing) {
             LOGW("[Pressure] Over-limit timing started pressure=%ldmmHg confirm=%lums",
@@ -711,9 +741,7 @@ static AppFault pressure_step_once(float target_mmhg, float *measured_mmhg)
         error = target_mmhg - *measured_mmhg;
         g_pressure_error = error;
         /* Full speed at low pressure, continuously taper over the profile-defined pressure interval. */
-        command = clamp_float(profile->fast_speed * error /
-                              fmaxf(target_mmhg * profile->approach_ratio, 1.0f),
-                              0.0f, profile->fast_speed);
+        command = pressure_control_command(profile, error, dt_s, false);
         /* Use P control once filtered pressure reaches 50% of the target. */
         if (*measured_mmhg >= target_mmhg * PRESSURE_P_SWITCH_RATIO) {
             g_pressure_stage = PRESS_STAGE_HOLD;
@@ -843,6 +871,7 @@ AppFault TreatmentHw_PressureStep(float target_mmhg, float *measured_mmhg)
 
 static AppFault pressure_begin_recovery(const char *reason)
 {
+    g_ads_sample_valid = false;
     PressureLimit_Reset(&g_overpressure);
     Tmc5130Driver_Enable(false);
     g_pressure_active = false;

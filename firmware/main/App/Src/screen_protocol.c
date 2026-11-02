@@ -1,6 +1,7 @@
 #include "screen_protocol.h"
 
 #include <string.h>
+#include <math.h>
 
 #include "app_config.h"
 #include "app_controller.h"
@@ -96,6 +97,13 @@ static void handle_work_frame(const uint8_t *frame)
     float value = 0.0f;
 
     memcpy(&value, &frame[5], sizeof(value));
+    if (!isfinite(value) || fabsf(value) > 10000.0f) return;
+    switch (command) {
+    case 0x8900: case 0x1041: case 0x1005: case 0x1037:
+    case 0x1040: case 0x1006: case 0x1036: case 0x1030: case 0x1034: case 0x1038:
+        return; /* A legacy packet cannot start or stop a versioned session. */
+    default: break;
+    }
     LOGI("[Screen RX] cmd=0x%04X value_x100=%ld", command,
          (long)(value * 100.0f));
     switch (command) {
@@ -286,13 +294,17 @@ void ScreenProtocol_Feed(const uint8_t *data, size_t length)
         if (g_rx_length < 3U) {
             return;
         }
-        frame_size = g_rx_stream[2];
-        if (frame_size != WORK_FRAME_SIZE && frame_size != PREP_FRAME_SIZE) {
+        frame_size = g_rx_stream[0] == WORK_HEADER_0 ? WORK_FRAME_SIZE : PREP_FRAME_SIZE;
+        if (g_rx_stream[2] != frame_size) {
             memmove(g_rx_stream, &g_rx_stream[1], --g_rx_length);
             continue;
         }
         if (g_rx_length < frame_size) {
             return;
+        }
+        if (!frame_is_valid(g_rx_stream, frame_size)) {
+            memmove(g_rx_stream, g_rx_stream + 1, --g_rx_length);
+            continue;
         }
         if (frame_is_valid(g_rx_stream, frame_size)) {
             if (g_rx_stream[0] == WORK_HEADER_0) {
@@ -308,6 +320,14 @@ void ScreenProtocol_Feed(const uint8_t *data, size_t length)
 
 void ScreenProtocol_SendFloat(uint16_t command, float value)
 {
+    /* Versioned snapshots replace legacy runtime events/telemetry. Configuration
+     * and charging decoration retain their existing wire format during migration. */
+    switch (command) {
+    case 0x2041: case 0x2037: case 0x2005: case 0x2047: case 0x2050:
+    case 0x2051: case 0x2052: case 0x2055: case 0x2056: case 0x2057: case 0x20f0:
+        return;
+    default: break;
+    }
     uint8_t frame[WORK_FRAME_SIZE] = {WORK_HEADER_0, WORK_HEADER_1, WORK_FRAME_SIZE};
     uint16_t crc;
 
@@ -342,6 +362,7 @@ void ScreenProtocol_SendU16(uint16_t command, uint16_t value)
 
 void ScreenProtocol_SendU32(uint16_t command, uint32_t value)
 {
+    if (command == 0x2f01) return; /* Fault status is in the state snapshot. */
     uint8_t frame[WORK_FRAME_SIZE] = {WORK_HEADER_0, WORK_HEADER_1, WORK_FRAME_SIZE};
     uint16_t crc;
 

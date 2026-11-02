@@ -1,4 +1,5 @@
 #include "storage_driver.h"
+#include "config_journal.h"
 
 #include <string.h>
 
@@ -27,9 +28,12 @@ static uint16_t g_counters[3];
 __attribute__((used, section(".program_marker"), aligned(8)))
 const uint64_t g_storage_program_marker_image = STORAGE_PROGRAM_PENDING_MAGIC;
 
+static ConfigJournal journal;
 static bool storage_erase_main(void);
 static bool storage_initialize_screen_presets(void);
 
+
+#if PRODUCT_MAIN_EEPROM_RESET_AFTER_PROGRAM
 static bool storage_program_reset_pending(void)
 {
     const volatile uint64_t *marker =
@@ -64,6 +68,8 @@ static bool storage_mark_program_reset_handled(void)
            *(const volatile uint64_t *)STORAGE_PROGRAM_MARKER_ADDRESS ==
                STORAGE_PROGRAM_HANDLED_MAGIC;
 }
+
+#endif
 
 static void ee_delay_us(uint16_t microseconds)
 {
@@ -218,23 +224,46 @@ uint16_t StorageDriver_BootLanguage(void)
     return StorageDriver_ReadU16(STORAGE_LANGUAGE_ADDRESS, 0U);
 }
 
+static bool config_value_valid(uint8_t address, uint16_t value)
+{
+    if (value == 0xffffU) return false;
+    switch(address) {
+    case 6: case 0xf8: return value <= 1;
+    case 0xfc: return value <= 3;
+    case 8: case 16: case 24: return value > 0 && value <= 43;
+    case 10: case 18: case 26: return value > 0 && value <= 650;
+    case 12: case 20: case 28: return value > 0 && value <= 60;
+    default: return true;
+    }
+}
 uint16_t StorageDriver_ReadU16(uint8_t address, uint16_t default_value)
 {
-    uint8_t high;
-    uint8_t low;
-
-    if (!ee_read_byte(address, &high) ||
-        !ee_read_byte((uint8_t)(address + 1U), &low) ||
-        (high == 0xFFU && low == 0xFFU)) {
-        return default_value;
+    int key = Cj_Key(address);
+    uint16_t value;
+    if (key >= 0) {
+        if (!journal.loaded && !Cj_Load(&journal, ee_read_byte)) return default_value;
+        value = Cj_Get(&journal, (uint8_t)key);
+    } else {
+        uint8_t hi, lo;
+        if (!ee_read_byte(address, &hi) || !ee_read_byte((uint8_t)(address+1), &lo)) return default_value;
+        value = (uint16_t)((uint16_t)hi << 8) | lo;
     }
-    return (uint16_t)((uint16_t)high << 8U) | low;
+    return config_value_valid(address, value) ? value : default_value;
 }
-
 bool StorageDriver_WriteU16(uint8_t address, uint16_t value)
 {
-    return ee_write_byte(address, (uint8_t)(value >> 8U)) &&
-           ee_write_byte((uint8_t)(address + 1U), (uint8_t)value);
+    int key = Cj_Key(address);
+    if (key < 0 || !config_value_valid(address, value)) return false;
+    return Cj_Set(&journal, ee_read_byte, ee_write_byte, (uint8_t)key, value);
+}
+
+bool StorageDriver_SavePreset(uint8_t preset, uint16_t pressure, uint16_t minutes)
+{
+    if (preset < 1 || preset > 3 || !pressure || pressure > 650 || !minutes || minutes > 60) return false;
+    uint8_t base = preset == 1 ? 8 : preset == 2 ? 16 : 24;
+    uint8_t keys[2] = {(uint8_t)Cj_Key(base+2), (uint8_t)Cj_Key(base+4)};
+    uint16_t values[2] = {pressure, minutes};
+    return Cj_SetMany(&journal, ee_read_byte, ee_write_byte, keys, values, 2);
 }
 
 static bool storage_write_u16_verified(uint8_t address, uint16_t value)
@@ -332,6 +361,7 @@ static bool storage_erase_main(void)
             success = false;
         }
     }
+    journal.loaded = false;
     memset(g_counters, 0, sizeof(g_counters));
     return success;
 }
@@ -346,7 +376,7 @@ void StorageDriver_IncrementCounter(AppMode mode)
     if (mode >= APP_MODE_HEAT && mode <= APP_MODE_AUTO) {
         uint8_t index = (uint8_t)mode - 1U;
         uint8_t address = (uint8_t)(index * 2U);
-        uint16_t next_count = (uint16_t)(g_counters[index] + 1U);
+        uint16_t next_count = g_counters[index] >= 65534U ? 65534U : (uint16_t)(g_counters[index] + 1U);
 
         if (!storage_write_u16_verified(address, next_count)) {
             LOGE("[Storage] Treatment counter write failed mode=%u value=%u",

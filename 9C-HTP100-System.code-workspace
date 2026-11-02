@@ -1,0 +1,7 @@
+{
+  "folders": [
+    {"name": "System", "path": "."},
+    {"name": "Main firmware", "path": "firmware/main"},
+    {"name": "Screen firmware", "path": "firmware/screen"}
+  ]
+}

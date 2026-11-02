@@ -1,4 +1,5 @@
 #include "eye_driver.h"
+#include "tmp112_sample.h"
 
 #include <stdint.h>
 
@@ -213,7 +214,7 @@ void EyeDriver_Init(void)
     g_temp_sample_seen = false;
     g_diag_started = false;
     g_diag_last_ms = 0U;
-    LOGW("[TMP112 DIAG] UNIFIED READ BENCH BUILD; no <=0C shutdown protection");
+    LOGI("[TMP112] Validated normal-mode samples; invalid samples inhibit heating");
     g_recovery_count = 0U;
     g_stable_state = APP_EYE_ABSENT;
     g_startup_absent_samples = 0U;
@@ -227,16 +228,10 @@ void EyeDriver_Init(void)
 static bool eye_read_temperature(float *temperature_c)
 {
     uint8_t data[2];
-    int16_t raw;
-
-    if (temperature_c == NULL ||
-        tmp112_read_register(0x00U, data) != HAL_OK) {
-        return false;
-    }
-    raw = (int16_t)(((uint16_t)data[0] << 8U) | data[1]);
-    raw >>= 4;
-    *temperature_c = (float)raw * 0.0625f;
-    return true;
+    if (temperature_c == NULL || tmp112_read_register(0x01U, data) != HAL_OK) return false;
+    uint16_t config = (uint16_t)((uint16_t)data[0] << 8) | data[1];
+    if (!Tmp112_ConfigValid(config) || tmp112_read_register(0x00U, data) != HAL_OK) return false;
+    return Tmp112_Decode((uint16_t)((uint16_t)data[0] << 8) | data[1], temperature_c);
 }
 
 bool EyeDriver_ReadTemperature(float *temperature_c)
@@ -253,6 +248,7 @@ bool EyeDriver_ReadTemperatureTelemetry(float *temperature_c)
 
 void EyeDriver_DiagnosticsTick(void)
 {
+    if (!APP_ENABLE_TMP112_DIAGNOSTICS) return;
     uint32_t now = HAL_GetTick();
     uint8_t data[2];
     if (g_diag_started && now - g_diag_last_ms < 1000U) {

@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "screen_link.h"
 #include "dma.h"
 #include "dma2d.h"
 #include "i2c.h"
@@ -201,6 +202,7 @@ int main(void)
   lv_port_indev_init();
   screen_finish_startup_language_preload();
   ui_init();
+  ScreenLink_Init();
   screen_boot_progress(7U);
   //HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_1);//start PWM for Beep
   /* Keep PA11/TIM1_CH4 dark until the first UI frame is drawn. No wait
@@ -231,10 +233,11 @@ int main(void)
         for (uint8_t batch = 0U; batch < 4U; ++batch) {
             received = ScreenUart_Read(serial_data, sizeof(serial_data));
             if (received == 0U) break;
+            ScreenLink_Feed(serial_data, received);
             Serial_data_stream_parsing(serial_data, received);
         }
         GT911_Process();
-        screen_treatment_ack_tick();
+        ScreenLink_Tick();
         /* Include startup settings and the shield popup in the first frame. */
         screen_fault_popup_tick();
         screen_refresh_runtime_ui();
@@ -257,7 +260,7 @@ if (HAL_GetTick() - save_picture_time >= 1000) {
    lv_obj_add_flag(ui_Image107,
                    LV_OBJ_FLAG_HIDDEN); /// Flags
 }
-work_flinsh();
+/* Host owns treatment completion; no UI-generated natural finish. */
         if (!screen_start_ack_received() &&
             (HAL_GetTick() - last_screenstart_time >= 1000U)) {
             screenstart();

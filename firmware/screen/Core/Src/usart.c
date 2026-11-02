@@ -79,6 +79,7 @@ static void screen_uart_store_from_isr(const uint8_t *data, uint16_t length)
 size_t ScreenUart_Read(uint8_t *destination, size_t capacity)
 {
   size_t count = 0U;
+  if (huart1.RxState == HAL_UART_STATE_READY && screen_uart_start_receive() != HAL_OK) uart_rx_restart_error_count++;
 
   while (destination != NULL && count < capacity &&
          uart_rx_read != uart_rx_write) {

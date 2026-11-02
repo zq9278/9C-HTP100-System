@@ -29,7 +29,7 @@ typedef struct {
     bool (*home_begin)(void);
     AppAsyncResult (*home_poll)(void);
     void (*home_cancel)(void);
-    AppFault (*pressure_zero_calibrate)(void);
+    AppAsyncResult (*pressure_zero_poll)(bool begin, AppFault *fault);
     AppEyeState (*eye_read_state)(void);
     bool (*eye_mark_consumed)(void);
     bool (*power_read)(bool *charging, bool *full, uint16_t *soc, uint16_t *millivolts);
@@ -45,6 +45,8 @@ typedef struct {
     void (*screen_u16)(uint16_t command, uint16_t value);
     void (*screen_u32)(uint16_t command, uint32_t value);
     void (*fault_report)(AppFault fault);
+    bool (*pressure_sample_valid)(void);
+    bool (*save_preset)(uint8_t preset, uint16_t pressure, uint16_t minutes);
 } AppPort;
 
 #endif
