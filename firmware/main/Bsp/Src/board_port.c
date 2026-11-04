@@ -186,7 +186,7 @@ bool Board_Init(void)
     StorageDriver_Init();
     PressureTuning_Init();
     if (!PressureTuning_Load(StorageDriver_ReadBytes, StorageDriver_WriteBytes))
-        LOGW("[Calibration] EEPROM read failed; using compiled defaults, save unavailable");
+        LOGW("[Calibration] EEPROM load/default initialization failed; using compiled defaults");
     g_ads_ready = Ads1220Driver_Init();
     if (!g_ads_ready) {
         LOGW("[ADS1220] Startup degraded; UI, charging and non-pressure functions remain available");

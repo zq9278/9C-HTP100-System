@@ -43,13 +43,13 @@ static uint8_t execute(uint16_t cmd, float value, uint16_t duration_s)
             AppController_Stop(APP_STOP_USER);
         AppController_SetEngineeringMode(value != 0); return SW_OK;
     }
-    if (cmd == 0x9201) {
+    if (cmd == 0x9201 || cmd == 0x9204) {
         if (!AppController_EngineeringMode()) return SW_REJECTED;
         if (s->state != APP_STATE_IDLE) return SW_BUSY;
         if (value <= 0 || value > APP_MAX_TARGET_PRESSURE_MMHG ||
             duration_s > APP_MAX_RUNTIME_MINUTES * 60U || duration_s % 60U) return SW_BAD_VALUE;
-        if (!AppController_Prepare(APP_MODE_AUTO, value)) return SW_REJECTED;
-        AppController_SetTemperature(42.5f);
+        if (!AppController_Prepare(cmd == 0x9204 ? APP_MODE_PRESSURE : APP_MODE_AUTO, value)) return SW_REJECTED;
+        if (cmd == 0x9201) AppController_SetTemperature(42.5f);
         if (AppController_StartAging()) return SW_OK;
         AppController_Stop(APP_STOP_USER); return SW_REJECTED;
     }

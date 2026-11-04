@@ -288,6 +288,16 @@ static void test_static_ui(void)
         if(!strcmp(lv_label_get_text(caption),"Apply"))apply_button=child;
     }
     assert(save_button && apply_button);
+    const char *expected_values[]={"20000","60000","200.0","0.900"};
+    unsigned value_index=0;
+    for(unsigned i=0;i<lv_obj_get_child_cnt(cal_page);i++){
+        lv_obj_t *child=lv_obj_get_child(cal_page,i);
+        if(lv_obj_check_type(child,&lv_textarea_class)){
+            assert(value_index<4);
+            assert(!strcmp(lv_textarea_get_text(child),expected_values[value_index++]));
+        }
+    }
+    assert(value_index==4);
     assert(!lv_obj_has_state(save_button,LV_STATE_DISABLED));
     ui_pressure_calibration_state(APP_STATE_RUNNING,true,false,0,250);
     assert(lv_obj_has_state(save_button,LV_STATE_DISABLED));

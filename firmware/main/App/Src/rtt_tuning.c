@@ -7,9 +7,9 @@
 #include "main.h"
 #include <string.h>
 static SwParser parser;
-static uint8_t down[256];
 static char logs[2048];
 static uint32_t owner, last_keepalive;
+volatile uint32_t g_rtt_recovery[8];
 static void receive(uint8_t type,uint16_t seq,const uint8_t *p,uint8_t n)
 {
     if(n<4)return;
@@ -42,10 +42,36 @@ void RttTuning_Init(void)
 {
     SEGGER_RTT_Init();
     SEGGER_RTT_ConfigUpBuffer(1,"HTP100 logs",logs,sizeof(logs),SEGGER_RTT_MODE_NO_BLOCK_SKIP);
-    SEGGER_RTT_ConfigDownBuffer(0,"HTP100 tuning",down,sizeof(down),SEGGER_RTT_MODE_NO_BLOCK_SKIP);
+    /* Channel zero uses BUFFER_SIZE_DOWN; ConfigDownBuffer cannot resize it. */
+    SEGGER_RTT_SetNameDownBuffer(0,"HTP100 tuning");
+}
+static bool ring_invalid(void)
+{
+    return _SEGGER_RTT.aUp[0].RdOff >= _SEGGER_RTT.aUp[0].SizeOfBuffer ||
+           _SEGGER_RTT.aUp[0].WrOff >= _SEGGER_RTT.aUp[0].SizeOfBuffer ||
+           _SEGGER_RTT.aUp[1].RdOff >= _SEGGER_RTT.aUp[1].SizeOfBuffer ||
+           _SEGGER_RTT.aUp[1].WrOff >= _SEGGER_RTT.aUp[1].SizeOfBuffer ||
+           _SEGGER_RTT.aDown[0].RdOff >= _SEGGER_RTT.aDown[0].SizeOfBuffer ||
+           _SEGGER_RTT.aDown[0].WrOff >= _SEGGER_RTT.aDown[0].SizeOfBuffer;
 }
 void RttTuning_Tick(void)
 {
+    if(ring_invalid()) {
+        g_rtt_recovery[0]++;
+        g_rtt_recovery[1]=HAL_GetTick();
+        g_rtt_recovery[2]=_SEGGER_RTT.aUp[0].RdOff;
+        g_rtt_recovery[3]=_SEGGER_RTT.aUp[0].WrOff;
+        g_rtt_recovery[4]=_SEGGER_RTT.aUp[1].RdOff;
+        g_rtt_recovery[5]=_SEGGER_RTT.aUp[1].WrOff;
+        g_rtt_recovery[6]=_SEGGER_RTT.aDown[0].RdOff;
+        g_rtt_recovery[7]=_SEGGER_RTT.aDown[0].WrOff;
+        /* Drop the diagnostic lease and partial frame, never continue using
+         * out-of-range debug ring offsets. Treatment state is unchanged. */
+        if(owner)PressureTuning_ResetDefaults();
+        PressureTuning_SetLease(false);owner=0;memset(&parser,0,sizeof(parser));
+        RttTuning_Init();
+        return;
+    }
     if(owner&&HAL_GetTick()-last_keepalive>=2000U){PressureTuning_ResetDefaults();PressureTuning_SetLease(false);owner=0;}
     uint8_t bytes[64];unsigned n=SEGGER_RTT_Read(0,bytes,sizeof(bytes));
     Sw_Feed(&parser,bytes,n,receive);

@@ -3,11 +3,14 @@
 #include <stdio.h>
 #include <string.h>
 #include "rtt_tuning.h"
+#include "SEGGER_RTT.h"
 #include "pressure_tuning.h"
 #include "system_wire.h"
 static uint32_t now;static uint8_t incoming[64],reply[64];static size_t count;
 uint32_t HAL_GetTick(void){return now;}
-void SEGGER_RTT_Init(void){}
+TestRttCB _SEGGER_RTT;
+void SEGGER_RTT_Init(void){memset(&_SEGGER_RTT,0,sizeof(_SEGGER_RTT));_SEGGER_RTT.aUp[0].SizeOfBuffer=1024;_SEGGER_RTT.aUp[1].SizeOfBuffer=2048;_SEGGER_RTT.aDown[0].SizeOfBuffer=256;}
+int SEGGER_RTT_SetNameDownBuffer(unsigned i,const char *name){assert(i==0);(void)name;return 0;}
 int SEGGER_RTT_ConfigUpBuffer(unsigned a,const char*b,void*c,unsigned d,unsigned e){assert(a==1);assert(d>=1024);(void)b;(void)c;(void)e;return 0;}
 int SEGGER_RTT_ConfigDownBuffer(unsigned a,const char*b,void*c,unsigned d,unsigned e){(void)a;(void)b;(void)c;(void)d;(void)e;return 0;}
 unsigned SEGGER_RTT_Read(unsigned a,void*b,unsigned n){(void)a;assert(count<=n);memcpy(b,incoming,count);unsigned r=(unsigned)count;count=0;return r;}
@@ -33,5 +36,11 @@ int main(void)
  now=1999;RttTuning_Tick();assert(PressureTuning_Get(1,&current)&&current.kp==55);
  now=2000;RttTuning_Tick();assert(PressureTuning_Get(1,&current)&&current.kp==original.kp);
  request(0x13,123,&original);assert(reply[8]==SW_STALE);
+ request(0x10,123,NULL);changed=original;changed.kp=75;
+ request(0x13,123,&changed);assert(PressureTuning_Leased());
+ _SEGGER_RTT.aUp[0].RdOff=0xe00177a6U;RttTuning_Tick();
+ assert(!PressureTuning_Leased());assert(_SEGGER_RTT.aUp[0].RdOff==0);
+ assert(PressureTuning_Get(1,&current)&&current.kp==original.kp);
+ request(0x10,456,NULL);assert(reply[8]==SW_OK);
  puts("PASS: RTT lease, exclusive owner, invalid profile rejection, disconnect defaults");
 }

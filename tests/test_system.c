@@ -252,7 +252,12 @@ static void test_calibration_protocol(void) {
     assert(calibration_writes==before+3 && calibration_status==SW_OK);
     PressureTuning_ResetDefaults();assert(PressureTuning_Get(1,&profile));assert(fabsf(profile.kp-123.4f)<.01f);
     v[2]=NAN;assert(ScreenLink_RequestCalibration(1,1,v));exchange();assert(calibration_status==SW_BAD_VALUE);v[2]=200;
-    assert(ScreenLink_Request(0x9201,250,0));exchange();assert(AppController_Status()->state==APP_STATE_RUNNING);
+    assert(ScreenLink_Request(0x9204,250,0));exchange();assert(AppController_Status()->state==APP_STATE_RUNNING);
+    assert(AppController_Status()->mode==APP_MODE_PRESSURE);
+    assert(AppController_Status()->settings.pressure_mmhg==250);
+    for(unsigned i=0;i<10;i++)advance(200);
+    assert(last_heat_target<=0);
+    assert(AppController_Status()->remaining_ms==UINT32_MAX);
     assert(ScreenLink_RequestCalibration(1,1,v));exchange();assert(calibration_status==SW_OK);
     assert(ScreenLink_RequestCalibration(2,1,v));exchange();assert(calibration_status==SW_BUSY);
     assert(ScreenLink_Request(0x1038,0,0));exchange();advance(200);

@@ -1,6 +1,6 @@
 {
   "name": "htp100-firmware-flasher",
-  "version": "1.2.0",
+  "version": "1.2.8",
   "private": true,
   "main": "main.js",
   "scripts": {

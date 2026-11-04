@@ -80,7 +80,12 @@ bool PressureTuning_Load(PressureRead read, PressureWrite write) {
         for(unsigned i=0;i<5;i++)saved[i]=unpack(r+5+8*i);
         persisted=true;
     }
-    PressureTuning_ResetDefaults();return true;
+    PressureTuning_ResetDefaults();
+    /* Commit all five defaults on first boot using atomic save/read-back.
+     * Valid records never get overwritten; failed reads never trigger writes.
+     * Failed initial commits retain defaults and retry on the next boot. */
+    if(!va&&!vb)return PressureTuning_SaveProfile(0,&saved[0]);
+    return true;
 }
 const PressureTuningProfile *PressureTuning_ProfileForTarget(float target) {
     unsigned i=target<=200?0:target<=300?1:target<=400?2:target<=500?3:4;

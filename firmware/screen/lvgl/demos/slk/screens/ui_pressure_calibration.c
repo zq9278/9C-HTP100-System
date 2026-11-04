@@ -60,7 +60,7 @@ void ui_pressure_calibration_open(lv_event_t *e){
  label(page,en()?"Speed 1..65535; Kp 0.1..1000\nRatio 0.01..1; saves current profile":"速度1~65535  Kp 0.1~1000\n减速比0.01~1 保存仅覆盖当前挡",20,350,440);
  buttons[2]=button(en()?"Apply":"临时应用",20,412,210,2);
  buttons[3]=button(en()?"Save to host":"保存到主机",250,412,210,3);
- buttons[4]=button(en()?"Apply + aging":"应用并老化",20,470,210,4);
+ buttons[4]=button(en()?"Start squeeze":"开始挤压",20,470,210,4);
  buttons[5]=button(en()?"Stop":"停止",250,470,210,5);
  actual=label(page,"",20,531,440);message=label(page,"",20,567,440);
  keyboard=lv_keyboard_create(page);lv_obj_set_style_text_font(keyboard,LV_FONT_DEFAULT,LV_PART_ITEMS);lv_keyboard_set_mode(keyboard,LV_KEYBOARD_MODE_NUMBER);lv_obj_set_size(keyboard,480,250);lv_obj_align(keyboard,LV_ALIGN_BOTTOM_MID,0,0);
@@ -71,12 +71,20 @@ void screen_calibration_result(uint8_t status,uint8_t op,uint8_t index,bool save
  if(!ui_pressure_calibration_active()||index!=selected)return;
  if(status || !v){start_after_apply=false;if(op==0)loaded=false;text("操作失败 请检查连接或参数","Failed: check link / parameters");return;}
  loaded=true;
- for(unsigned i=0;i<4;i++){char s[24];snprintf(s,sizeof(s),i<2?"%.0f":i==2?"%.1f":"%.3f",(double)v[i]);lv_textarea_set_text(fields[i],s);}
+ /* nano libc does not link printf float support on the MCU. Format the
+  * protocol's fixed precision using integer conversions instead. */
+ for(unsigned i=0;i<4;i++){
+   char s[24];unsigned scale=i<2?1U:i==2?10U:1000U;
+   unsigned value=(unsigned)lroundf(v[i]*(float)scale);
+   if(i<2)snprintf(s,sizeof(s),"%u",value);
+   else snprintf(s,sizeof(s),i==2?"%u.%01u":"%u.%03u",value/scale,value%scale);
+   lv_textarea_set_text(fields[i],s);
+ }
  if(op==2)text("保存成功 已读回校验","Saved and verified");
  else if(op==1)text("临时生效 未保存","Applied temporarily; not saved");
  else if(saved)text("已读取当前参数 存在保存记录","Read current profile; saved table exists");
  else text("已读取默认参数 无保存记录","Read defaults; no saved record");
- if(start_after_apply&&op==1){start_after_apply=false;if(!ScreenLink_Request(0x9201,150+100*selected,0))text("启动失败","Start failed");}
+ if(start_after_apply&&op==1){start_after_apply=false;if(!ScreenLink_Request(0x9204,150+100*selected,0))text("启动失败","Start failed");}
 }
 void ui_pressure_calibration_state(uint8_t state,bool authorized,bool pending,uint8_t result,uint16_t pressure){
  if(!ui_pressure_calibration_active())return;
@@ -86,5 +94,5 @@ void ui_pressure_calibration_state(uint8_t state,bool authorized,bool pending,ui
  if(pending||running)lv_obj_add_state(gear,LV_STATE_DISABLED);else lv_obj_clear_state(gear,LV_STATE_DISABLED);
  lv_label_set_text_fmt(actual,en()?"Pressure: %u mmHg":"当前压力: %u mmHg",pressure);
  if(!authorized||!ScreenLink_Healthy()){loaded=false;text("工程权限或连接已失效","Engineering mode / link unavailable");}
- else if(!pending&&result && ScreenLink_LastCommand()==0x9201)text("启动失败 请检查主机","Start rejected; check host");
+ else if(!pending&&result && ScreenLink_LastCommand()==0x9204)text("启动失败 请检查主机","Start rejected; check host");
 }
