@@ -5,6 +5,13 @@
 
 #include "../ui.h"
 #include "screen_link.h"
+#include "ui_pressure_calibration.h"
+LV_FONT_DECLARE(ui_font_calibration22);
+static lv_obj_t *calibration_text;
+static void calibration_language(lv_event_t *e) {
+    (void)e;
+    lv_label_set_text(calibration_text, ui_lang_get()==UI_LANG_EN ? "Pressure calibration" : "\u538b\u529b\u6821\u51c6");
+}
 
 lv_obj_t * ui_Factorymode = NULL;
 lv_obj_t * ui_Image80 = NULL;
@@ -226,6 +233,16 @@ void ui_Factorymode_screen_init(void)
     lv_obj_set_style_text_color(ui_Label14, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_Label14, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label14, &ui_font_alibaba30, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    lv_obj_t *calibration = lv_btn_create(ui_Factorymode);
+    lv_obj_set_size(calibration, 260, 50);
+    lv_obj_align(calibration, LV_ALIGN_CENTER, 0, 65);
+    calibration_text = lv_label_create(calibration);
+    lv_obj_set_style_text_font(calibration_text, &ui_font_calibration22, 0);
+    lv_label_set_text(calibration_text, ui_lang_get()==UI_LANG_EN ? "Pressure calibration" : "压力校准");
+    lv_obj_center(calibration_text);
+    lv_obj_add_event_cb(calibration, ui_pressure_calibration_open, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(ui_Factorymode,calibration_language,LV_EVENT_SCREEN_LOADED,NULL);
 
     lv_obj_add_event_cb(ui_Button17, ui_event_Button17, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_Panel6, ui_event_Panel6, LV_EVENT_ALL, NULL);

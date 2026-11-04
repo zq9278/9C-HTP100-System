@@ -2,6 +2,7 @@
 #include "system_wire.h"
 #include "app_controller.h"
 #include "app_config.h"
+#include "pressure_tuning.h"
 #include "board_port.h"
 #include "main.h"
 #include <math.h>
@@ -11,6 +12,9 @@ static SwParser parser;
 static uint32_t boot_id, peer_id, last_heartbeat, last_snapshot;
 static uint16_t snapshot_sequence, request_sequence, acknowledged_sequence;
 static bool peer_seen, request_seen, snapshot_pending;
+static bool cal_seen;
+static uint16_t cal_seq;
+static uint8_t cal_request[26],cal_result[24];
 static uint8_t last_request[SW_REQUEST_BYTES], last_result[8];
 volatile uint32_t g_link_tx_failures, g_link_rejected_requests;
 
@@ -82,7 +86,7 @@ static void receive(uint8_t type, uint16_t seq, const uint8_t *p, uint8_t size)
             /* A restarted UI cannot inherit an unacknowledged treatment. */
             AppController_SetScreenLinkHealthy(false);
             AppController_SetEngineeringMode(false);
-            request_seen = false;
+            request_seen = false;cal_seen=false;
         }
         uint16_t ack = Sw_Get16(p + 8);
         if (Sw_IsNewer(ack, snapshot_sequence)) return;
@@ -94,6 +98,34 @@ static void receive(uint8_t type, uint16_t seq, const uint8_t *p, uint8_t size)
             AppController_Stop(APP_STOP_USER); snapshot_pending = true;
         }
         return;
+    }
+    if(type == SW_CAL_REQUEST && size == 26) {
+        uint8_t reply[24]={0};Sw_Put32(reply,boot_id);
+        reply[5]=p[8];reply[6]=p[9];
+        if(cal_seen && seq==cal_seq) {
+            if(!memcmp(p,cal_request,26))send(SW_CAL_RESULT,seq,cal_result,24);
+            else {reply[4]=SW_STALE;send(SW_CAL_RESULT,seq,reply,24);}
+            return;
+        }
+        if(Sw_Get32(p)!=boot_id || Sw_Get32(p+4)!=AppController_Status()->session_id ||
+           (cal_seen && !Sw_IsNewer(seq,cal_seq))) reply[4]=SW_STALE;
+        else if(!healthy())reply[4]=SW_NO_LINK;
+        else if(!AppController_EngineeringMode())reply[4]=SW_REJECTED;
+        else if(PressureTuning_Leased())reply[4]=SW_BUSY;
+        else if(p[8]>2 || p[9]>=5)reply[4]=SW_BAD_VALUE;
+        else {
+            const AppSnapshot *s=AppController_Status();
+            PressureTuningProfile profile;memcpy(&profile,p+10,16);
+            if(p[8] && s->state!=APP_STATE_IDLE && !(p[8]==1 && s->state==APP_STATE_RUNNING))reply[4]=SW_BUSY;
+            else if(p[8]==1 && !PressureTuning_Apply(p[9],&profile))reply[4]=SW_BAD_VALUE;
+            else if(p[8]==2 && !PressureTuning_SaveProfile(p[9],&profile))reply[4]=SW_REJECTED;
+            if(PressureTuning_Get(p[9],&profile))memcpy(reply+8,&profile,16);
+        }
+        reply[7]=PressureTuning_Persisted();
+        if(!cal_seen || Sw_IsNewer(seq,cal_seq)) {
+            cal_seen=true;cal_seq=seq;memcpy(cal_request,p,26);memcpy(cal_result,reply,24);
+        }
+        send(SW_CAL_RESULT,seq,reply,24);snapshot_pending=true;return;
     }
     if (type != SW_REQUEST || size != SW_REQUEST_BYTES) return;
     uint16_t cmd = Sw_Get16(p + 8);
@@ -124,6 +156,7 @@ void SystemLink_Init(void)
 {
     memset(&parser, 0, sizeof(parser));
     boot_id = Sw_BootId(HAL_GetUIDw0() ^ HAL_GetUIDw1());
+    cal_seen=false;
     peer_seen = request_seen = false; snapshot_pending = true;
     acknowledged_sequence = snapshot_sequence = request_sequence = 0;
     last_heartbeat = last_snapshot = 0;

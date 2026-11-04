@@ -9,8 +9,8 @@ static uint32_t boot_id, host_id, session_id, last_snapshot, last_heartbeat, sen
 static uint16_t snapshot_sequence, request_sequence;
 static bool seen, pending, dirty, stop_latched;
 static uint32_t stop_session;
-static uint8_t attempts, result;
-static uint8_t snapshot[SW_SNAPSHOT_BYTES], request[SW_REQUEST_BYTES];
+static uint8_t attempts, result, request_kind=SW_REQUEST, request_length=SW_REQUEST_BYTES;
+static uint8_t snapshot[SW_SNAPSHOT_BYTES], request[SW_MAX_PAYLOAD];
 volatile uint32_t g_screen_link_tx_errors, g_screen_link_request_timeouts;
 static bool send(uint8_t type, uint16_t sequence, const uint8_t *p, uint8_t size)
 {
@@ -38,6 +38,15 @@ bool ScreenLink_IsTreatmentCommand(uint16_t cmd)
            cmd == 0x1006 || cmd == 0x1036 || cmd == 0x1030 || cmd == 0x1034 ||
            cmd == 0x1038 || cmd == 0x8900;
 }
+bool ScreenLink_RequestCalibration(uint8_t op,uint8_t index,const float *values) {
+    if(!ScreenLink_Healthy() || pending || op>2 || index>=5)return false;
+    memset(request,0,sizeof(request));
+    Sw_Put32(request,host_id);Sw_Put32(request+4,session_id);
+    request[8]=op;request[9]=index;if(values)memcpy(request+10,values,16);
+    request_kind=SW_CAL_REQUEST;request_length=26;request_sequence++;
+    pending=true;attempts=1;result=SW_OK;sent_at=HAL_GetTick();dirty=true;
+    (void)send(request_kind,request_sequence,request,request_length);return true;
+}
 bool ScreenLink_Request(uint16_t cmd, float value, uint16_t duration_s)
 {
     if (!ScreenLink_Healthy()) { result = SW_NO_LINK; dirty = true; return false; }
@@ -52,12 +61,13 @@ bool ScreenLink_Request(uint16_t cmd, float value, uint16_t duration_s)
         if (old == 0x1041 || old == 0x1005 || old == 0x1037) return false;
     }
     if (cmd == 0x8900) return false; /* Countdown is owned by the controller. */
+    request_kind=SW_REQUEST;request_length=SW_REQUEST_BYTES;
     Sw_Put32(request, host_id); Sw_Put32(request + 4, session_id);
     Sw_Put16(request + 8, cmd); memcpy(request + 10, &value, 4); Sw_Put16(request + 14, duration_s);
     if (stop) { stop_latched = true; stop_session = session_id; }
     request_sequence++; pending = true; attempts = 1; result = SW_OK;
     sent_at = HAL_GetTick(); dirty = true;
-    (void)send(SW_REQUEST, request_sequence, request, sizeof(request));
+    (void)send(request_kind, request_sequence, request, request_length);
     return true;
 }
 static void receive(uint8_t type, uint16_t sequence, const uint8_t *p, uint8_t size)
@@ -72,7 +82,11 @@ static void receive(uint8_t type, uint16_t sequence, const uint8_t *p, uint8_t s
             (Sw_Get16(request + 8) == 0x1041 || Sw_Get16(request + 8) == 0x1005 || Sw_Get16(request + 8) == 0x1037)) result = SW_OK;
         if (p[12] != APP_STATE_RUNNING && p[12] != APP_STATE_READY && p[12] != APP_STATE_PREHEAT) stop_latched = false;
         memcpy(snapshot, p, size); seen = true; last_snapshot = HAL_GetTick(); dirty = true;
-    } else if (type == SW_RESULT && size == 8 && pending && sequence == request_sequence &&
+    } else if(type==SW_CAL_RESULT && size==24 && pending && request_kind==SW_CAL_REQUEST &&
+              sequence==request_sequence && Sw_Get32(p)==host_id && p[5]==request[8] && p[6]==request[9]) {
+        float values[4];memcpy(values,p+8,16);result=p[4];pending=false;dirty=true;
+        screen_calibration_result(result,p[5],p[6],p[7]!=0,values);
+    } else if (type == SW_RESULT && size == 8 && pending && request_kind==SW_REQUEST && sequence == request_sequence &&
                Sw_Get16(p) == Sw_Get16(request + 8)) {
         result = p[2]; pending = false; dirty = true;
         if (result == SW_OK && ((Sw_Get16(p) >= 0x9101 && Sw_Get16(p) <= 0x9103) || Sw_Get16(p) == 0x9202 || Sw_Get16(p) == 0x9203)) screen_config_saved();
@@ -98,9 +112,10 @@ void ScreenLink_Tick(void)
     if (pending && now - sent_at >= ((Sw_Get16(request + 8) == 0x9202 || Sw_Get16(request + 8) == 0x9203) ? 2500U : 250U)) {
         if (attempts >= 4 || !ScreenLink_Healthy()) {
             pending = false; result = SW_NO_LINK; dirty = true; g_screen_link_request_timeouts++;
+            if(request_kind==SW_CAL_REQUEST)screen_calibration_result(SW_NO_LINK,request[8],request[9],false,NULL);
         } else {
             attempts++; sent_at = now;
-            (void)send(SW_REQUEST, request_sequence, request, sizeof(request));
+            (void)send(request_kind, request_sequence, request, request_length);
         }
     }
     if (!ScreenLink_Healthy()) { screen_system_link_lost(); return; }

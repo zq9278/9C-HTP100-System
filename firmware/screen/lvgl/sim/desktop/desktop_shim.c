@@ -81,3 +81,6 @@ void UART_TransmitWithRetry(UART_HandleTypeDef *huart, uint8_t *data, uint32_t l
     (void)data;
     (void)len;
 }
+
+uint16_t ScreenLink_LastCommand(void){return sim_last_command;}
+bool ScreenLink_RequestCalibration(uint8_t op,uint8_t index,const float *values){(void)op;(void)index;(void)values;return true;}

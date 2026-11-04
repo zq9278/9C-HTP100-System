@@ -24,7 +24,7 @@ extern int value3;
 extern int value4;
 extern uint8_t usart1_tx;
 extern uint16_t prepare_set, bee, prepare_time, prepare_crimp;
-uint16_t language = UI_LANG_EN;
+uint16_t language = UI_LANG_ZH;
 // extern DMA_HandleTypeDef hdma_usart1_tx;
 volatile uint8_t work_mode =
     0; // 0:娌″伐浣溿€?1锛氱儹鏁枫€?2锛氳剦鍐层€?3锛氳嚜鍔?

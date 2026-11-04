@@ -16,7 +16,7 @@ if not gcc:
     raise SystemExit('Install GCC / MinGW and put gcc on PATH before running the SDL test.')
 env['PATH'] = str(Path(gcc).parent) + os.pathsep + env['PATH']
 subprocess.run(['cmake', '-S', str(ROOT / 'firmware/screen/lvgl'), '-B', str(build),
-                '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Debug', '-DCMAKE_C_COMPILER=' + gcc], env=env, check=True)
+                '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Debug', '-DCMAKE_C_COMPILER=' + Path(gcc).as_posix()], env=env, check=True)
 subprocess.run(['cmake', '--build', str(build), '--parallel', '8'], env=env, check=True)
 executable = build / ('slk_sdl_sim.exe' if os.name == 'nt' else 'slk_sdl_sim')
 for key in list(env):

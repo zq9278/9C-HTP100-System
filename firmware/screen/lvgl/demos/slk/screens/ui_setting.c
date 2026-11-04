@@ -189,7 +189,7 @@ void ui_setting_screen_init(void)
     lv_obj_set_x(ui_TextArea38, -49);
     lv_obj_set_y(ui_TextArea38, 280);
     lv_obj_set_align(ui_TextArea38, LV_ALIGN_CENTER);
-    lv_textarea_set_text(ui_TextArea38, "完整版本号: V1.0.0.");
+    lv_textarea_set_text(ui_TextArea38, "完整版本号: V1.0.2.");
     lv_textarea_set_placeholder_text(ui_TextArea38, "Placeholder...");
     lv_obj_set_style_text_color(ui_TextArea38, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_TextArea38, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -206,7 +206,7 @@ void ui_setting_screen_init(void)
     lv_obj_set_y(ui_TextArea42, 278);
     lv_obj_set_align(ui_TextArea42, LV_ALIGN_CENTER);
     lv_textarea_set_one_line(ui_TextArea42, true);
-    lv_textarea_set_text(ui_TextArea42, "20260129");
+    lv_textarea_set_text(ui_TextArea42, "20261104");
     lv_textarea_set_placeholder_text(ui_TextArea42, "Placeholder...");
     lv_obj_clear_flag(ui_TextArea42, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);      /// Flags
     lv_obj_set_style_text_color(ui_TextArea42, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);

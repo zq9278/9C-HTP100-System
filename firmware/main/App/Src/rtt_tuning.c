@@ -18,13 +18,13 @@ static void receive(uint8_t type,uint16_t seq,const uint8_t *p,uint8_t n)
     Sw_Put32(response+4,token);Sw_Put32(response+24,PRODUCT_VERSION_NUMBER);
     if(type==0x10 && n==4 && token){
         if(owner && owner!=token) response[1]=SW_BUSY;
-        else {owner=token;last_keepalive=HAL_GetTick();}
+        else {owner=token;PressureTuning_SetLease(true);last_keepalive=HAL_GetTick();}
     }else if(!owner && type==0x14 && n==4 && token) { /* Lost reset ACK: already restored. */ }
     else if(!owner||token!=owner){response[1]=SW_STALE;}
     else {
         last_keepalive=HAL_GetTick();
         if(type==0x11 && n==4) { /* Lease heartbeat. */ }
-        else if(type==0x14 && n==4){PressureTuning_ResetDefaults();owner=0;}
+        else if(type==0x14 && n==4){PressureTuning_ResetDefaults();PressureTuning_SetLease(false);owner=0;}
         else if((type==0x12&&n==5)||(type==0x13&&n==21)){
             PressureTuningProfile profile;uint8_t index=p[4];response[2]=index;
             if(type==0x13){
@@ -46,7 +46,7 @@ void RttTuning_Init(void)
 }
 void RttTuning_Tick(void)
 {
-    if(owner&&HAL_GetTick()-last_keepalive>=2000U){PressureTuning_ResetDefaults();owner=0;}
+    if(owner&&HAL_GetTick()-last_keepalive>=2000U){PressureTuning_ResetDefaults();PressureTuning_SetLease(false);owner=0;}
     uint8_t bytes[64];unsigned n=SEGGER_RTT_Read(0,bytes,sizeof(bytes));
     Sw_Feed(&parser,bytes,n,receive);
 }

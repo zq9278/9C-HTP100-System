@@ -1,3 +1,6 @@
+#include "screens/ui_pressure_calibration.h"
+#include "system_state.h"
+#include "screen_link.h"
 #define SDL_MAIN_HANDLED
 
 #include "lvgl.h"
@@ -269,6 +272,30 @@ static void test_static_ui(void)
     ui_battery_warning_update(false, false, false);
     assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
     puts("PASS: battery acknowledgement beeps respecting mute, acknowledged low stays dismissed across treatment and escalation, recovered deferred notice dismisses");
+    ui_pressure_calibration_open(NULL);
+    assert(ui_pressure_calibration_active());
+    float calibration_values[4]={20000,60000,200,.9f};
+    screen_calibration_result(0,0,0,false,calibration_values);
+    ui_pressure_calibration_state(APP_STATE_IDLE,true,false,0,0);
+    lv_obj_t *cal_page=lv_scr_act();
+    assert(lv_obj_get_child_cnt(cal_page)>15);
+    lv_obj_t *save_button=NULL,*apply_button=NULL;
+    for(unsigned i=0;i<lv_obj_get_child_cnt(cal_page);i++){
+        lv_obj_t *child=lv_obj_get_child(cal_page,i);
+        if(!lv_obj_check_type(child,&lv_btn_class))continue;
+        lv_obj_t *caption=lv_obj_get_child(child,0);
+        if(!strcmp(lv_label_get_text(caption),"Save to host"))save_button=child;
+        if(!strcmp(lv_label_get_text(caption),"Apply"))apply_button=child;
+    }
+    assert(save_button && apply_button);
+    assert(!lv_obj_has_state(save_button,LV_STATE_DISABLED));
+    ui_pressure_calibration_state(APP_STATE_RUNNING,true,false,0,250);
+    assert(lv_obj_has_state(save_button,LV_STATE_DISABLED));
+    assert(!lv_obj_has_state(apply_button,LV_STATE_DISABLED));
+    assert(ui_pressure_calibration_active());
+    _ui_screen_change(&ui_home_page,LV_SCR_LOAD_ANIM_NONE,0,0,&ui_home_page_screen_init);
+    puts("PASS: calibration page constructs, loads values and survives running snapshots");
+
 }
 
 int main(int argc, char **argv)
@@ -303,6 +330,12 @@ int main(int argc, char **argv)
         }
     }
     if (getenv("SLK_SELF_TEST")) test_static_ui();
+    if (getenv("SLK_CALIBRATION")) {
+        ui_pressure_calibration_open(NULL);
+        float v[4]={20000,60000,200,.9f};
+        screen_calibration_result(0,0,0,false,v);
+        ui_pressure_calibration_state(APP_STATE_IDLE,true,false,0,0);
+    }
     if (getenv("SLK_LOW_BATTERY")) {
         ui_startup_finish();
         ui_battery_warning_update(true, true, false);

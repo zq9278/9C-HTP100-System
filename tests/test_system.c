@@ -9,6 +9,7 @@
 #include "system_link.h"
 #include "screen_link.h"
 #include "pressure_motion.h"
+#include "pressure_tuning.h"
 #include "tmp112_sample.h"
 #include "usart.h"
 #define main original_controller_suite
@@ -25,10 +26,16 @@ static unsigned drop_snapshot, drop_result, drop_request;
 static unsigned lost_calls;
 static uint8_t rendered_result;
 void screen_config_saved(void) {}
+static uint8_t calibration_status;
+static uint8_t calibration_memory[256];
+static unsigned calibration_writes;
+static bool cal_read(uint8_t a,uint8_t *p,size_t n){memcpy(p,calibration_memory+a,n);return true;}
+static bool cal_write(uint8_t a,const uint8_t *p,size_t n){calibration_writes++;memcpy(calibration_memory+a,p,n);return true;}
+void screen_calibration_result(uint8_t s,uint8_t o,uint8_t i,bool saved,const float *v){calibration_status=s;(void)o;(void)i;(void)saved;(void)v;}
 bool Board_ScreenWrite(const uint8_t *p, uint16_t n)
 {
     if (p[3] == SW_SNAPSHOT && drop_snapshot) { drop_snapshot--; return true; }
-    if (p[3] == SW_RESULT && drop_result) { drop_result--; return true; }
+    if ((p[3] == SW_RESULT || p[3] == SW_CAL_RESULT) && drop_result) { drop_result--; return true; }
     assert(screen_size + n <= sizeof(to_screen)); memcpy(to_screen + screen_size,p,n);screen_size+=n;return true;
 }
 int HAL_UART_Transmit(UART_HandleTypeDef *u, const uint8_t *p, uint16_t n, uint32_t t)
@@ -230,6 +237,27 @@ static void test_prepare_during_return_and_zero(void)
     assert(rendered_result == SW_OK);
 }
 static unsigned parsed;
+static void test_calibration_protocol(void) {
+    reset_fixture();PressureTuning_Init();memset(calibration_memory,0xff,256);
+    assert(PressureTuning_Load(cal_read,cal_write));SystemLink_Init();ScreenLink_Init();
+    for(unsigned i=0;i<5;i++)advance(200);
+    float v[4]={21000,42000,123.4f,.5f};
+    assert(ScreenLink_RequestCalibration(0,1,NULL));exchange();assert(calibration_status==SW_REJECTED);
+    assert(ScreenLink_Request(0x9200,1,0));exchange();
+    assert(ScreenLink_RequestCalibration(0,1,NULL));exchange();assert(calibration_status==SW_OK);
+    assert(ScreenLink_RequestCalibration(1,1,v));exchange();assert(calibration_status==SW_OK);
+    PressureTuningProfile profile;assert(PressureTuning_Get(1,&profile));assert(fabsf(profile.kp-123.4f)<.01f);
+    drop_result=1;unsigned before=calibration_writes;
+    assert(ScreenLink_RequestCalibration(2,1,v));exchange();advance(300);
+    assert(calibration_writes==before+3 && calibration_status==SW_OK);
+    PressureTuning_ResetDefaults();assert(PressureTuning_Get(1,&profile));assert(fabsf(profile.kp-123.4f)<.01f);
+    v[2]=NAN;assert(ScreenLink_RequestCalibration(1,1,v));exchange();assert(calibration_status==SW_BAD_VALUE);v[2]=200;
+    assert(ScreenLink_Request(0x9201,250,0));exchange();assert(AppController_Status()->state==APP_STATE_RUNNING);
+    assert(ScreenLink_RequestCalibration(1,1,v));exchange();assert(calibration_status==SW_OK);
+    assert(ScreenLink_RequestCalibration(2,1,v));exchange();assert(calibration_status==SW_BUSY);
+    assert(ScreenLink_Request(0x1038,0,0));exchange();advance(200);
+    assert(ScreenLink_Request(0x9200,0,0));exchange();assert(PressureTuning_Get(1,&profile));assert(fabsf(profile.kp-123.4f)<.01f);
+}
 static void test_battery_display_transients(void)
 {
     reset_fixture();
@@ -351,7 +379,7 @@ static void test_wire_and_motion(void)
 }
 int main(void)
 {
-    original_controller_suite();test_engineering_link();test_cooperative_zero();test_wire_and_motion();test_local_deadline_and_bounds();test_link();test_one_way_loss_and_reboots();test_prepare_during_return_and_zero();test_voltage_policy();test_battery_display_transients();
+    original_controller_suite();test_engineering_link();test_cooperative_zero();test_wire_and_motion();test_local_deadline_and_bounds();test_link();test_one_way_loss_and_reboots();test_prepare_during_return_and_zero();test_voltage_policy();test_calibration_protocol();test_battery_display_transients();
     assert(PressureMotion_Slew(20000,0,.02f,100000)==0);
     assert(PressureMotion_Slew(0,20000,.02f,100000)==2000);
     puts("PASS: controller, protocol recovery, real host/client link, duplicate requests, timer rollover, motion continuity");

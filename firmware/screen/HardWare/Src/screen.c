@@ -4,6 +4,7 @@
 #include "system_state.h"
 #include "ui.h"
 #include "ui-myself.h"
+#include "screens/ui_pressure_calibration.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -94,7 +95,7 @@ void screen_backlight_tick(void)
   }
 }
 
-static uint32_t software_version = 20260129UL;
+static uint32_t software_version = 20261104UL;
 static uint8_t screen_start_ack = 0;
 static volatile uint8_t startup_language_received = 0U;
 static volatile uint8_t startup_language_preload_enabled = 1U;
@@ -941,6 +942,10 @@ void screen_apply_system_state(const uint8_t *p, bool pending, uint8_t result)
     else if (!(p[15] & 128U) && lv_scr_act() == ui_Factorymode)
       _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
   }
+  if(ui_pressure_calibration_active()) {
+    ui_pressure_calibration_state(state,(p[15]&128U)!=0,pending,result,auto_pressure);
+    screen_fault_popup_tick();return;
+  }
   if (open && mode >= 1 && mode <= 3) {
     if (mode == 1 && lv_scr_act() != ui_hotting)
       _ui_screen_change(&ui_hotting, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_hotting_screen_init);
@@ -1014,6 +1019,7 @@ void screen_config_saved(void)
 
 void screen_system_link_lost(void)
 {
+  ui_pressure_calibration_state(APP_STATE_IDLE,false,false,SW_NO_LINK,0);
   system_sample_flags = 0;
   HAL_TIM_Base_Stop_IT(&htim14);
   screen_fault_popup_tick();

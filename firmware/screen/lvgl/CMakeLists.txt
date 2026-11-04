@@ -109,6 +109,7 @@ target_include_directories(slk_sdl_sim PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/demos/slk
     ${CMAKE_CURRENT_SOURCE_DIR}/sim/desktop/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../HardWare/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/protocol
 )
 target_compile_options(slk_sdl_sim PRIVATE -UNDEBUG)
 

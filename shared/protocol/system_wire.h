@@ -11,7 +11,7 @@
 #define SW_REQUEST_BYTES 16U
 #define SW_PERIOD_MS 200U
 #define SW_TIMEOUT_MS 2000U
-enum { SW_HEARTBEAT = 1, SW_SNAPSHOT = 2, SW_REQUEST = 3, SW_RESULT = 4 };
+enum { SW_HEARTBEAT = 1, SW_SNAPSHOT = 2, SW_REQUEST = 3, SW_RESULT = 4, SW_CAL_REQUEST = 5, SW_CAL_RESULT = 6 };
 enum { SW_OK = 0, SW_REJECTED = 1, SW_STALE = 2, SW_BAD_VALUE = 3,
        SW_BUSY = 4, SW_NO_LINK = 5 };
 typedef void (*SwReceive)(uint8_t type, uint16_t sequence, const uint8_t *payload, uint8_t size);

@@ -185,6 +185,8 @@ bool Board_Init(void)
      * the ADC can perform conversion-to-pressure validation. */
     StorageDriver_Init();
     PressureTuning_Init();
+    if (!PressureTuning_Load(StorageDriver_ReadBytes, StorageDriver_WriteBytes))
+        LOGW("[Calibration] EEPROM read failed; using compiled defaults, save unavailable");
     g_ads_ready = Ads1220Driver_Init();
     if (!g_ads_ready) {
         LOGW("[ADS1220] Startup degraded; UI, charging and non-pressure functions remain available");

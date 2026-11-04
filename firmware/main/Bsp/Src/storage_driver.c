@@ -1,4 +1,5 @@
 #include "storage_driver.h"
+#include "pressure_tuning.h"
 #include "config_journal.h"
 
 #include <string.h>
@@ -371,7 +372,9 @@ static bool storage_erase_main(void)
 
 bool StorageDriver_EraseMain(void)
 {
-    return storage_erase_main();
+    if(!storage_erase_main())return false;
+    PressureTuning_Init();
+    return PressureTuning_Load(StorageDriver_ReadBytes,StorageDriver_WriteBytes);
 }
 
 void StorageDriver_IncrementCounter(AppMode mode)

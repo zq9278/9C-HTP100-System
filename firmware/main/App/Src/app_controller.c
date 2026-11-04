@@ -8,6 +8,7 @@
 #include "app_log.h"
 #include "product_config.h"
 #include "pressure_limit.h"
+#include "pressure_tuning.h"
 
 #define SCREEN_TEMP_HEAT             0x2041U
 #define SCREEN_TEMP_AUTO             0x2037U
@@ -771,7 +772,10 @@ bool AppController_StorageWrite(uint8_t address, uint16_t value)
            g_app.port->storage_write_u16(address, value);
 }
 
-void AppController_SetEngineeringMode(bool enabled) { g_app.engineering_mode = enabled; }
+void AppController_SetEngineeringMode(bool enabled) {
+    if(g_app.engineering_mode && !enabled && !PressureTuning_Leased()) PressureTuning_ResetDefaults();
+    g_app.engineering_mode = enabled;
+}
 bool AppController_EngineeringMode(void) { return g_app.engineering_mode; }
 
 bool AppController_StorageEraseMain(void)

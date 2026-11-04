@@ -2,10 +2,10 @@
 #define PRODUCT_CONFIG_H
 
 /* Product identity. PRODUCT_VERSION_NUMBER is sent to the LCD and tuning host. */
-#define PRODUCT_DEFAULT_LANGUAGE    1U /* CE: English; saved user choice takes precedence. */
-#define PRODUCT_VERSION_STRING      "V1.0.0.20260129"
+#define PRODUCT_DEFAULT_LANGUAGE    0U /* Default Chinese; saved user choice takes precedence. */
+#define PRODUCT_VERSION_STRING      "V1.0.2.20261104"
 #define PRODUCT_MODEL_NAME          "9C-HTP100"
-#define PRODUCT_VERSION_NUMBER      20260129UL
+#define PRODUCT_VERSION_NUMBER      20261104UL
 
 /* Add this value to the heater control setpoint and subtract it from the LCD's
  * measured-temperature display. Safety checks and tuning-host telemetry keep
