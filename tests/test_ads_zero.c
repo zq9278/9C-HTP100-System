@@ -26,6 +26,7 @@ int HAL_SPI_Receive(SPI_HandleTypeDef *h,uint8_t *p,unsigned n,unsigned t) {
 void AppLog_Write(const char *level,const char *fmt,...) { (void)level;(void)fmt; }
 int main(void) {
     assert(Ads1220Driver_Init());
+    assert(!Ads1220Driver_ZeroCancel());
     uint32_t before=tick;
     assert(Ads1220Driver_ZeroPoll(true)==ADS1220_RESULT_BUSY);
     assert(tick-before<10); /* No 500 ms blocking settle. */
@@ -34,12 +35,20 @@ int main(void) {
     for(int i=0;i<31;i++)assert(Ads1220Driver_ZeroPoll(false)==ADS1220_RESULT_BUSY);
     assert(Ads1220Driver_ZeroPoll(false)==ADS1220_RESULT_OK);
     assert(Ads1220Driver_ZeroValid()&&Ads1220Driver_ZeroRaw()==6000000);
+    assert(Ads1220Driver_ZeroPoll(true)==ADS1220_RESULT_BUSY);
+    tick+=500;sample=5900000;
+    for(int i=0;i<12;i++)assert(Ads1220Driver_ZeroPoll(false)==ADS1220_RESULT_BUSY);
+    assert(Ads1220Driver_ZeroCancel());
+    assert(Ads1220Driver_ZeroValid()&&Ads1220Driver_ZeroRaw()==6000000);
+    assert(Ads1220Driver_ZeroPoll(false)==ADS1220_RESULT_COMM);
+    assert(!Ads1220Driver_ZeroCancel());
     assert(Ads1220Driver_ZeroPoll(true)==ADS1220_RESULT_BUSY);tick+=500;
     for(int i=0;i<32;i++) {
         sample=i<16?5500000:6000000;
         assert(Ads1220Driver_ZeroPoll(false)==(i==31?ADS1220_RESULT_ZERO_UNSTABLE:ADS1220_RESULT_BUSY));
     }
     assert(!Ads1220Driver_ZeroValid());
+    assert(!Ads1220Driver_ZeroCancel());
     assert(Ads1220Driver_ZeroPoll(true)==ADS1220_RESULT_BUSY);tick+=500;fail_read=true;
     assert(Ads1220Driver_ZeroPoll(false)==ADS1220_RESULT_COMM);
     assert(!Ads1220Driver_ZeroValid());

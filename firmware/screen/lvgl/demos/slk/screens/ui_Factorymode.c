@@ -4,6 +4,7 @@
 // Project name: 9C-U-HTP100-UI-ZN
 
 #include "../ui.h"
+#include "screen_link.h"
 
 lv_obj_t * ui_Factorymode = NULL;
 lv_obj_t * ui_Image80 = NULL;
@@ -26,7 +27,7 @@ void ui_event_Button17(lv_event_t * e)
     lv_event_code_t event_code = lv_event_get_code(e);
 
     if(event_code == LV_EVENT_RELEASED) {
-        _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
+        (void)ScreenLink_Request(0x9200, 0, 0);
         BEE1(e);
     }
 }
@@ -36,7 +37,6 @@ void ui_event_Panel6(lv_event_t * e)
     lv_event_code_t event_code = lv_event_get_code(e);
 
     if(event_code == LV_EVENT_RELEASED) {
-        _ui_screen_change(&ui_autoing, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_autoing_screen_init);
         _ui_flag_modify(ui_Keyboard1, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_ADD);
         Factorymodecall(e);
     }

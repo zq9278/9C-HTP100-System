@@ -1,5 +1,5 @@
 """JSON-lines IPC to J-Link RTT. Never halt, reset or patch target variables."""
-import json, os, queue, secrets, struct, sys, threading, time
+import codecs, json, math, os, queue, secrets, struct, sys, threading, time
 from pathlib import Path
 def crc(data):
     c=0xffff
@@ -23,7 +23,7 @@ class Frames:
             frames.append((b[3],struct.unpack_from('<H',b,4)[0],bytes(b[7:size-2])));del b[:size]
         return frames
 class Bridge:
-    def __init__(self): self.link=None;self.seq=0;self.token=secrets.randbits(32) or 1;self.frames=Frames()
+    def __init__(self): self.link=None;self.seq=0;self.token=secrets.randbits(32) or 1;self.frames=Frames();self.decoder=codecs.getincrementaldecoder("utf-8")("replace")
     def transact(self,kind,extra=b''):
         self.seq=(self.seq+1)&0xffff;packet=encode(kind,self.seq,struct.pack('<I',self.token)+extra)
         for attempt in range(3):
@@ -36,7 +36,17 @@ class Bridge:
                     return p
                 time.sleep(.01)
         raise TimeoutError('RTT timeout. Check Tuning firmware and close other J-Link sessions.')
-    def connect(self):
+    def logs(self):
+        if self.link:
+            data=bytes(self.link.rtt_read(1,2048))
+            if data: print(json.dumps({'event':'log','text':self.decoder.decode(data)}),flush=True)
+    def connect(self, options=None):
+        options=options or {}
+        serial=str(options.get('serial',''))
+        speed=int(options.get('speed',1000))
+        if (serial and (not serial.isdigit() or len(serial)>12)) or speed not in (1000,4000,8000):
+            raise ValueError('Invalid probe settings')
+        if self.link: raise RuntimeError('Already connected')
         import pylink
         dll=os.environ.get('JLINK_DLL')
         if not dll and os.name=='nt':
@@ -45,8 +55,8 @@ class Bridge:
             if candidates:dll=str(candidates[0])
         self.link=pylink.JLink(**({'lib':pylink.library.Library(dllpath=dll)} if dll else {}))
         try:
-            self.link.open();self.link.set_tif(pylink.enums.JLinkInterfaces.SWD)
-            self.link.connect('STM32G070CB',speed=1000)
+            self.link.open(serial_no=int(serial) if serial else None);self.link.set_tif(pylink.enums.JLinkInterfaces.SWD)
+            self.link.connect('STM32G070CB',speed=speed)
             if self.link.halted():raise RuntimeError('Target halted. Resume it using the debugger first.')
             self.link.rtt_start();time.sleep(.15)
             response=self.transact(0x10)
@@ -57,7 +67,7 @@ class Bridge:
             try:self.transact(0x14)
             finally:self.link.close();self.link=None
     def request(self,method,args):
-        if method=='connect':return self.connect()
+        if method=='connect':return self.connect(args[0] if args else {})
         if method=='disconnect':self.close();return True
         if not self.link:raise RuntimeError('Not connected')
         if method=='keepalive':self.transact(0x11);return True
@@ -66,7 +76,7 @@ class Bridge:
         if method=='read':return list(struct.unpack_from('<4f',self.transact(0x12,bytes([index])),8))
         if method=='write':
             values=args[1]
-            if len(values)!=4:raise ValueError('Four parameters required')
+            if len(values)!=4 or any(not math.isfinite(v) for v in values) or not (0<values[0]<=65535 and 0<values[1]<=65535 and 0<values[2]<=1000 and .01<=values[3]<=1):raise ValueError('Invalid parameters')
             return list(struct.unpack_from('<4f',self.transact(0x13,bytes([index])+struct.pack('<4f',*values)),8))
         raise ValueError('Unknown method')
 def main():
@@ -81,6 +91,9 @@ def main():
         while True:
             try:cmd=commands.get(timeout=.1)
             except queue.Empty:
+                if bridge.link:
+                    try:bridge.logs()
+                    except Exception:pass
                 if bridge.link and time.monotonic()-last>=.5:
                     try:bridge.request('keepalive',[]);last=time.monotonic()
                     except Exception as e:

@@ -23,6 +23,7 @@ static uint8_t to_screen[4096], to_host[4096], rendered[SW_SNAPSHOT_BYTES];
 static size_t screen_size, host_size;
 static unsigned drop_snapshot, drop_result, drop_request;
 static unsigned lost_calls;
+static uint8_t rendered_result;
 void screen_config_saved(void) {}
 bool Board_ScreenWrite(const uint8_t *p, uint16_t n)
 {
@@ -37,7 +38,7 @@ int HAL_UART_Transmit(UART_HandleTypeDef *u, const uint8_t *p, uint16_t n, uint3
     assert(host_size+n<=sizeof(to_host)); memcpy(to_host+host_size,p,n);host_size+=n;return HAL_OK;
 }
 void screen_apply_system_state(const uint8_t *p, bool pending, uint8_t result)
-{ (void)pending;(void)result;memcpy(rendered,p,sizeof(rendered)); }
+{ (void)pending;rendered_result=result;memcpy(rendered,p,sizeof(rendered)); }
 void screen_system_link_lost(void) { lost_calls++; }
 static void exchange(void)
 {
@@ -49,6 +50,50 @@ static void exchange(void)
     ScreenLink_Tick();
 }
 static void advance(uint32_t ms) { fake_now += ms; AppController_Tick(); exchange(); }
+static void test_engineering_link(void)
+{
+    reset_fixture(); SystemLink_Init(); ScreenLink_Init();
+    for (unsigned i=0; i<5; i++) advance(200);
+    assert(ScreenLink_Request(0x9201,250,0)); exchange();
+    assert(rendered_result == SW_REJECTED);
+    assert(ScreenLink_Request(0x9200,1,0)); exchange();
+    assert(AppController_EngineeringMode() && (rendered[15] & 128));
+    assert(!AppController_DebugMode()); /* Screen service mode does not bypass charging. */
+    unsigned erased = storage_erase_count;
+    drop_result=1; drop_snapshot=1;
+    assert(ScreenLink_Request(0x9202,0,0)); exchange();
+    advance(2500); exchange();
+    assert(storage_erase_count == erased+1); /* Retried clear executes once. */
+    /* Reconnect/enter if the intentionally delayed exchange expired the lease. */
+    for (unsigned i=0;i<5;i++) advance(200);
+    assert(ScreenLink_Request(0x9200,1,0)); exchange();
+    storage_erase_ok=false;
+    assert(ScreenLink_Request(0x9203,0,0)); exchange();
+    assert(rendered_result == SW_REJECTED); storage_erase_ok=true;
+    assert(ScreenLink_Request(0x9201,9999,120)); exchange();
+    assert(rendered_result == SW_BAD_VALUE);
+    drop_result=1; drop_snapshot=1;
+    assert(ScreenLink_Request(0x9201,250,0)); exchange();
+    unsigned starts = pressure_start_count;
+    advance(300);
+    assert(pressure_start_count == starts && AppController_Status()->state == APP_STATE_RUNNING);
+    assert(AppController_Status()->remaining_ms == UINT32_MAX);
+    assert(!AppController_Start()); /* Rejected START must not turn aging into a timed session. */
+    for (unsigned i=0;i<900;i++) advance(200);
+    assert(AppController_Status()->state == APP_STATE_RUNNING);
+    assert(AppController_Status()->remaining_ms == UINT32_MAX);
+    assert(ScreenLink_Request(0x9202,0,0)); exchange();
+    assert(rendered_result == SW_BUSY);
+    assert(ScreenLink_Request(0x9200,0,0)); exchange();
+    assert(!AppController_EngineeringMode());
+    assert(AppController_Status()->state != APP_STATE_RUNNING);
+    advance(200);
+    assert(ScreenLink_Request(0x9200,1,0)); exchange();
+    assert(AppController_EngineeringMode());
+    fake_now += SW_TIMEOUT_MS + 1; SystemLink_Tick();
+    assert(!AppController_EngineeringMode());
+    screen_size=host_size=0;
+}
 static void test_link(void)
 {
     reset_fixture(); SystemLink_Init(); ScreenLink_Init();
@@ -143,7 +188,123 @@ static void test_one_way_loss_and_reboots(void)
     assert(rendered[12]==APP_STATE_IDLE);
     assert(!ScreenLink_Pending());
 }
+static void test_prepare_during_return_and_zero(void)
+{
+    for (unsigned natural = 0; natural < 2; natural++) {
+        setup_running();
+        fake_zero_busy = 8;
+        if (natural) {
+            fake_now += 60000;
+            AppController_Tick();
+            exchange();
+        } else {
+            assert(ScreenLink_Request(0x1034, 0, 0)); exchange();
+        }
+        unsigned starts = pressure_start_count;
+        assert(AppController_Status()->state == APP_STATE_HOMING);
+        /* Exercise motor return immediately, and zero calibration after home. */
+        if (natural) advance(200);
+        assert(AppController_Status()->state == APP_STATE_HOMING);
+        assert(ScreenLink_CanPrepare());
+        assert(pressure_start_count == starts);
+        assert(ScreenLink_Request(0x1005, 250, 60)); exchange();
+        assert(AppController_Status()->state == APP_STATE_READY);
+        assert(ScreenLink_Request(0x1006, 0, 0)); exchange();
+        assert(pressure_start_count == starts + 1);
+    }
+    /* Screen still sees IDLE while a physical-button session has already
+     * stopped on the host: the old session must still be rejected as STALE. */
+    host_size = screen_size = 0;
+    reset_fixture(); SystemLink_Init(); ScreenLink_Init();
+    for (unsigned i = 0; i < 5; i++) advance(200);
+    assert(ScreenLink_CanPrepare());
+    assert(AppController_Prepare(APP_MODE_PRESSURE, 250));
+    assert(AppController_Start());
+    AppController_Stop(APP_STOP_USER);
+    assert(ScreenLink_Request(0x1005, 250, 60)); exchange();
+    assert(rendered_result == SW_STALE);
+    assert(!ScreenLink_Pending());
+    advance(200);
+    assert(ScreenLink_CanPrepare());
+    assert(ScreenLink_Request(0x1005, 250, 60)); exchange();
+    assert(rendered_result == SW_OK);
+}
 static unsigned parsed;
+static void test_battery_display_transients(void)
+{
+    reset_fixture();
+    AppController_SetPower(false,false,100,4200);
+    assert(AppController_Status()->battery_level == 100);
+    for(unsigned i=0;i<10;i++) { fake_now+=100; AppController_SetPower(false,false,100,4000); }
+    assert(AppController_Status()->battery_level == 100);
+    for(unsigned i=0;i<100;i++) { fake_now+=100; AppController_SetPower(false,false,100,4200); }
+    assert(AppController_Status()->battery_level >= 98);
+    for(unsigned i=0;i<600;i++) { fake_now+=100; AppController_SetPower(false,false,100,3900); }
+    unsigned low = AppController_Status()->battery_level;
+    assert(low < 98 && low > 75);
+    for(unsigned i=0;i<600;i++) { fake_now+=100; AppController_SetPower(false,false,100,4200); }
+    assert(AppController_Status()->battery_level > low); /* Rebound is not permanently suppressed. */
+    AppController_SetPower(false,false,100,3250);
+    assert(AppController_Status()->low_battery_warning && AppController_Status()->battery_level <= 5);
+    reset_fixture();
+    AppController_SetEngineeringMode(true);
+    assert(AppController_Prepare(APP_MODE_AUTO,250)); assert(AppController_StartAging());
+    for(unsigned i=0;i<10;i++) AppController_SetPower(false,false,100,3150);
+    assert(AppController_Status()->state != APP_STATE_RUNNING);
+    assert(AppController_Status()->battery_shutdown_pending);
+}
+static void test_voltage_policy(void)
+{
+    reset_fixture();
+    AppController_SetPower(false, false, 50, 3250);
+    assert(AppController_Status()->low_battery_warning);
+    AppController_SetPower(true, false, 50, 3250);
+    assert(AppController_Status()->low_battery_warning);
+    AppController_SetPower(true, false, 50, 3349);
+    assert(AppController_Status()->low_battery_warning);
+    AppController_SetPower(false, false, 50, 4200);
+    assert(AppController_Status()->low_battery_warning);
+    AppController_SetPower(true, false, 50, 3350);
+    fake_now += 4999;
+    AppController_SetPower(true, false, 50, 3350);
+    assert(AppController_Status()->low_battery_warning);
+    AppController_PowerReadFailed();
+    fake_now += 1;
+    AppController_SetPower(true, false, 50, 3350);
+    assert(AppController_Status()->low_battery_warning);
+    fake_now += 5000;
+    AppController_SetPower(true, false, 50, 3350);
+    assert(!AppController_Status()->low_battery_warning);
+    reset_fixture();
+    AppController_SetPower(false, false, 0, 3800);
+    assert(!AppController_Status()->low_battery_warning);
+    unsigned level = AppController_Status()->battery_level;
+    AppController_SetPower(false, false, 100, 3800);
+    assert(AppController_Status()->battery_level == level);
+    assert(AppController_Prepare(APP_MODE_PRESSURE,250));assert(AppController_Start());
+    AppController_SetPower(false, false, 100, 3251);
+    assert(!AppController_Status()->low_battery_warning);
+    AppController_SetPower(false, false, 100, 3250);
+    assert(AppController_Status()->low_battery_warning);
+    for(unsigned i=0;i<9;i++)AppController_SetPower(false,false,100,3150);
+    assert(!AppController_Status()->battery_shutdown_pending);
+    AppController_PowerReadFailed();
+    AppController_SetPower(false,false,100,3150);
+    assert(!AppController_Status()->battery_shutdown_pending);
+    AppController_SetPower(false,false,100,3151); /* Above threshold breaks continuity. */
+    for(unsigned i=0;i<9;i++)AppController_SetPower(false,false,100,3150);
+    assert(!AppController_Status()->battery_shutdown_pending);
+    AppController_SetPower(false,false,100,3150);
+    assert(AppController_Status()->battery_shutdown_pending);
+    assert(AppController_Status()->state == APP_STATE_RUNNING);
+    assert(AppController_Status()->battery_level == 0);
+    AppController_SetPower(false,false,100,3800);
+    assert(AppController_Status()->battery_shutdown_pending);
+    assert(!AppController_Prepare(APP_MODE_PRESSURE,250));
+    AppController_Stop(APP_STOP_NATURAL);AppController_Tick();
+    assert(AppController_Status()->state == APP_STATE_SHUTDOWN);
+    assert(power_off_count == 1);
+}
 static void test_cooperative_zero(void)
 {
     reset_fixture();
@@ -190,7 +351,7 @@ static void test_wire_and_motion(void)
 }
 int main(void)
 {
-    original_controller_suite();test_cooperative_zero();test_wire_and_motion();test_local_deadline_and_bounds();test_link();test_one_way_loss_and_reboots();
+    original_controller_suite();test_engineering_link();test_cooperative_zero();test_wire_and_motion();test_local_deadline_and_bounds();test_link();test_one_way_loss_and_reboots();test_prepare_during_return_and_zero();test_voltage_policy();test_battery_display_transients();
     assert(PressureMotion_Slew(20000,0,.02f,100000)==0);
     assert(PressureMotion_Slew(0,20000,.02f,100000)==2000);
     puts("PASS: controller, protocol recovery, real host/client link, duplicate requests, timer rollover, motion continuity");

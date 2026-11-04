@@ -369,8 +369,8 @@ static void apply_zh_texts(void)
     restore_textarea(&ui_TextArea1, "参数设定");
     restore_textarea(&ui_TextArea3, " 系统设置");
     restore_textarea(&ui_TextArea37, "发布版本号: V1");
-    restore_textarea(&ui_TextArea38, "完整版本号: V1.0.2.");
-    set_textarea_ex(&ui_TextArea42, "20241226", 91, 279, 124, 26, &ui_font_alibaba10, 1);
+    restore_textarea(&ui_TextArea38, "完整版本号: V1.0.0.");
+    set_textarea_ex(&ui_TextArea42, "20260129", 91, 279, 124, 26, &ui_font_alibaba10, 1);
     restore_textarea(&ui_TextArea13, "设定一");
     restore_textarea(&ui_TextArea15, "设定二");
     restore_textarea(&ui_TextArea14, "设定三");
@@ -456,9 +456,9 @@ static void apply_en_texts(void)
 
     set_textarea(&ui_TextArea1, "Parameter Setting", INT16_MIN, INT16_MIN, 280, 54, font30);
     set_textarea(&ui_TextArea3, "System Setting", INT16_MIN, INT16_MIN, 250, 54, font30);
-    set_textarea_ex(&ui_TextArea37, "Version: V1", 0, 236, 260, 26, small, 1);
-    set_textarea_ex(&ui_TextArea38, "Software Ver: V1.0.2.", 0, 264, 260, 26, small, 1);
-    set_textarea_ex(&ui_TextArea42, "20241226", 0, 302, 260, 26, small, 1);
+    set_textarea_ex(&ui_TextArea37, "Version: V1", 0, 232, 300, 28, mid, 1);
+    set_textarea_ex(&ui_TextArea38, "Software Ver: V1.0.0.", 0, 264, 300, 28, mid, 1);
+    set_textarea_ex(&ui_TextArea42, "20260129", 0, 296, 260, 28, mid, 1);
     set_textarea(&ui_TextArea13, "Preset 1", INT16_MIN, INT16_MIN, 220, 58, font40);
     set_textarea(&ui_TextArea15, "Preset 2", INT16_MIN, INT16_MIN, 220, 58, font40);
     set_textarea(&ui_TextArea14, "Preset 3", INT16_MIN, INT16_MIN, 220, 58, font40);

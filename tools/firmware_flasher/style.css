@@ -4,3 +4,9 @@ body{padding:18px 30px}header{margin-bottom:14px}.eyebrow{font-size:11px}h1{font
 [hidden]{display:none!important}dialog{border:0;border-radius:18px;padding:30px 42px;text-align:center;color:#183d2e;max-width:520px;box-shadow:0 20px 80px #0003}dialog::backdrop{background:#13283b88}.success-mark{margin:auto;background:#daf5e5;color:#16834d;border-radius:50%;width:68px;height:68px;line-height:68px;font-size:42px}dialog h2{font-size:30px;margin:18px 0 12px}dialog p{line-height:1.8;white-space:pre-line}dialog button{margin-top:14px;min-width:140px}#status.success{font-size:17px;font-weight:700;background:#e3f7ea;padding:7px 12px;border-radius:7px}body{padding:16px 24px}header{margin-bottom:10px}.package{max-height:100px;overflow:auto}pre{height:95px}
 /* Long J-Link paths and uninterrupted diagnostics must not size the grid. */
 main{grid-template-columns:minmax(0,1fr)}main>section,details,.grow{min-width:0}details{max-width:100%}#log{width:100%;max-width:100%;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;overflow-x:auto}
+
+.targets{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.screen-variants{display:flex;gap:26px;margin:10px 0 0 18px;padding:10px 14px;border-left:2px solid #bfd1e4}.screen-variants label{display:flex;align-items:center;gap:7px;cursor:pointer}
+
+#flash-progress{margin-top:12px;padding:10px 12px;border-radius:8px;background:#eff6ff}#flash-progress-text{margin:0;color:#155ca2;font-weight:600}#flash-bar{display:block;height:14px;margin-top:8px;accent-color:#1565ba}#flash-progress.failed{background:#fff1f1}#flash-progress.failed p{color:#b32732}#flash-progress.failed progress{accent-color:#b32732}
+
+#rtt-log {height:190px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;} input[type=number] {width:125px;}

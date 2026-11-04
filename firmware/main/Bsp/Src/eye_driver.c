@@ -391,7 +391,7 @@ bool EyeDriver_MarkConsumed(void)
     return true;
 }
 
-void EyeDriver_Erase(void)
+bool EyeDriver_Erase(void)
 {
     uint8_t value = 0xFFU;
 
@@ -402,8 +402,12 @@ void EyeDriver_Erase(void)
         if (i2c2_mem_write(EYE_EEPROM_ADDRESS, (uint8_t)address,
                            &value, 1U, 80U) != HAL_OK) {
             LOGE("[Eye I2C] EEPROM erase stopped at address=0x%02X", (unsigned)address);
-            break;
+            return false;
         }
         vTaskDelay(pdMS_TO_TICKS(6U));
+        uint8_t verify = 0;
+        if (i2c2_mem_read(EYE_EEPROM_ADDRESS, (uint8_t)address, &verify, 1U, 80U) != HAL_OK || verify != 0xFFU)
+            return false;
     }
+    return true;
 }

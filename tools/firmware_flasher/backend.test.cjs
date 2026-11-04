@@ -3,6 +3,25 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), crypto = require('node:crypto');
 const {Programmer, validate, commandScript, commandArgs, LOADER} = require('./backend.cjs');
 const base = {role: 'screen-old', preset: 'Release', speed: 1000, serial: '123456'};
+test('8000 kHz reaches J-Link; speeds above the supported maximum are rejected', () => {
+  const args = commandArgs({...base, speed:8000}, 'program.jlink');
+  assert.equal(args[args.indexOf('-Speed')+1], '8000');
+  assert.throws(() => validate({...base,speed:12000}));
+});
+test('preferences survive restart and corrupted settings fall back to defaults', () => {
+  const pref = require('./preferences.cjs');
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(),'htp-preferences-'));
+  const file = path.join(folder,'settings.json');
+  try {
+    assert.deepEqual(pref.read(file),{});
+    const settings={target:'screen',panel:'screen-old',speed:'8000',serial:'123456',preset:'Release',rebuild:false};
+    pref.save(file,settings); assert.deepEqual(pref.read(file),settings);
+    pref.save(file,{...settings,target:'main'}); assert.equal(pref.read(file).target,'main');
+    assert.equal(pref.read(file).panel,'screen-old');
+    assert.deepEqual(pref.clean({speed:'9000',serial:'123\nloadfile x',target:'bad'}),{});
+    fs.writeFileSync(file,'broken');assert.deepEqual(pref.read(file),{});
+  } finally {fs.rmSync(file,{force:true});fs.rmdirSync(folder);}
+});
 test('targets are closed enums; probe arguments cannot inject commands', () => {
   assert.throws(() => validate({...base, role: '../main'}));
   assert.throws(() => validate({...base, serial: '123\nloadfile evil.hex'}));
@@ -35,15 +54,17 @@ test('flash uses frozen verified bytes and requires a download completion reply'
   const source=path.join(folder,'sample.hex'),tool=path.join(folder,'JLink.exe');
   fs.writeFileSync(source,'fixture');fs.writeFileSync(tool,'mock');
   const info={role:base.role,preset:base.preset,path:source,sha256:crypto.createHash('sha256').update('fixture').digest('hex')};
-  let flashes=0,good=true;
+  let flashes=0,good=true;const steps=[];
   const p=new Programmer({runner:async(cmd,args,opts)=>{
     if(args[0]==='scripts/package_info.py')return JSON.stringify(info);
     flashes++;assert.equal(cmd,tool);assert.equal(fs.readFileSync(path.join(opts.cwd,'firmware.hex'),'utf8'),'fixture');
     assert.ok(fs.readFileSync(path.join(opts.cwd,'program.jlink'),'utf8').includes(LOADER));
+    if (good) {opts.log('Downloa');opts.log('ding file [firmware.hex]...\n');opts.log('O.K.\n');}
     return good?'Downloading file [firmware.hex]...\nO.K.\n':'Connected only';
   }});
   try {
-    await p.flash({...base,jlink:tool,rebuild:false});assert.equal(flashes,1);
+    await p.flash({...base,jlink:tool,rebuild:false},()=>{},step=>steps.push(step));assert.equal(flashes,1);
+    assert.deepEqual(steps,[1,2,3]);
     good=false;await assert.rejects(p.flash({...base,jlink:tool}),/完整下载成功/);
     info.sha256='bad';await assert.rejects(p.flash({...base,jlink:tool}),/发生变化/);assert.equal(flashes,2);
   } finally {fs.unlinkSync(source);fs.unlinkSync(tool);fs.rmdirSync(folder);}

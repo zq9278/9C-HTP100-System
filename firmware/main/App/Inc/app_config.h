@@ -18,9 +18,11 @@
 #define APP_STANDARD_GRAVITY_M_S2          9.80665f
 
 /* Keep the thresholds used by the current released logic. */
-#define APP_LOW_BATTERY_WARNING_SOC       10U /* Warn strictly below this SOC. */
+#define APP_LOW_BATTERY_WARNING_MV        3250U
+#define APP_LOW_BATTERY_WARNING_CLEAR_MV  3350U
+#define APP_LOW_BATTERY_WARNING_RECOVERY_MS 5000U
 #define APP_LOW_BATTERY_SHUTDOWN_MV       3150U
-#define APP_LOW_BATTERY_CONFIRM_SAMPLES   5U
+#define APP_LOW_BATTERY_CONFIRM_SAMPLES   10U
 #define APP_BUTTON_DEBOUNCE_MS           30U
 #define APP_ENABLE_PRESSURE_DIAGNOSTIC_LOG 0U
 

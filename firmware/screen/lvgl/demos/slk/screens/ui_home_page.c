@@ -135,7 +135,7 @@ void ui_home_page_screen_init(void)
     lv_obj_clear_flag(ui_Image47, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
     ui_Slider1 = lv_slider_create(ui_battery);
-    lv_slider_set_value(ui_Slider1, 4, LV_ANIM_OFF);
+    lv_slider_set_value(ui_Slider1, 0, LV_ANIM_OFF);
     if(lv_slider_get_mode(ui_Slider1) == LV_SLIDER_MODE_RANGE) lv_slider_set_left_value(ui_Slider1, 1, LV_ANIM_OFF);
     lv_obj_set_width(ui_Slider1, 47);
     lv_obj_set_height(ui_Slider1, 22);

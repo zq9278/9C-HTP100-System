@@ -56,7 +56,45 @@ static uint16_t auto_pressure = 0;
 static uint8_t battery_percent = 0;
 static uint8_t battery_percent_valid = 0;
 static uint8_t system_sample_flags;
-static uint32_t software_version = 20241226UL;
+static bool system_treatment_running;
+static bool backlight_treatment_open;
+static bool backlight_asleep, backlight_initialized, backlight_swallow_touch;
+static uint32_t backlight_activity_ms;
+extern TIM_HandleTypeDef htim1;
+
+/* First touch wakes only; suppress the complete gesture to avoid blind clicks. */
+bool screen_backlight_touch(bool pressed)
+{
+  if (pressed) {
+    backlight_activity_ms = HAL_GetTick();
+    if (backlight_asleep) {
+      backlight_asleep = false;
+      backlight_swallow_touch = true;
+      __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 60);
+    }
+  }
+  bool consume = backlight_swallow_touch;
+  if (!pressed) backlight_swallow_touch = false;
+  return consume;
+}
+
+void screen_backlight_tick(void)
+{
+  uint32_t now = HAL_GetTick();
+  if (!backlight_initialized || backlight_treatment_open) {
+    backlight_initialized = true;
+    backlight_activity_ms = now;
+    if (backlight_asleep) {
+      backlight_asleep = false;
+      __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 60);
+    }
+  } else if (!backlight_asleep && now - backlight_activity_ms >= 120000U) {
+    backlight_asleep = true;
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, 0);
+  }
+}
+
+static uint32_t software_version = 20260129UL;
 static uint8_t screen_start_ack = 0;
 static volatile uint8_t startup_language_received = 0U;
 static volatile uint8_t startup_language_preload_enabled = 1U;
@@ -213,9 +251,9 @@ static version_text_layout_t version_text_layout(void) {
   version_text_layout_t layout;
 
   if (ui_lang_get() == UI_LANG_EN) {
-    layout.width = 124;
+    layout.width = 260;
     layout.height = 28;
-    layout.y = 289;
+    layout.y = 296;
     layout.pad_top = 1;
     layout.pad_bottom = 0;
   } else {
@@ -310,14 +348,15 @@ void screen_refresh_runtime_ui(void) {
   else if (ui_Label30) lv_label_set_text(ui_Label30, "--");
   if (system_sample_flags & 1U) set_temperature_label(ui_Label39, auto_temperature_tenths);
   else if (ui_Label39) lv_label_set_text(ui_Label39, "--");
-  if (system_sample_flags & 2U) set_pressure_label(ui_Label32, pulsation_pressure);
-  else if (ui_Label32) lv_label_set_text(ui_Label32, "--");
-  if (system_sample_flags & 2U) set_pressure_label(ui_Label46, auto_pressure);
-  else if (ui_Label46) lv_label_set_text(ui_Label46, "--");
+  set_pressure_label(ui_Label32, pulsation_pressure);
+  set_pressure_label(ui_Label46, auto_pressure);
   set_version_text();
+  ui_battery_warning_update(ScreenLink_Healthy() && (system_sample_flags & 32U),
+                            ScreenLink_Healthy() && (system_sample_flags & 64U),
+                            system_treatment_running || !ScreenLink_Healthy());
 
   if (!battery_percent_valid) {
-    return;
+    battery_percent = 0;
   }
 
   if (ui_Slider1 != NULL) lv_slider_set_value(ui_Slider1, battery_percent, LV_ANIM_ON);
@@ -345,8 +384,7 @@ void screen_reset_hotting_runtime_ui(void) {
 
 void screen_reset_pulsationning_runtime_ui(void) {
   pulsation_pressure = 0;
-  if (system_sample_flags & 2U) set_pressure_label(ui_Label32, pulsation_pressure);
-  else if (ui_Label32) lv_label_set_text(ui_Label32, "--");
+  set_pressure_label(ui_Label32, pulsation_pressure);
 }
 
 void screen_reset_autoing_runtime_ui(void) {
@@ -354,8 +392,7 @@ void screen_reset_autoing_runtime_ui(void) {
   auto_pressure = 0;
   if (system_sample_flags & 1U) set_temperature_label(ui_Label39, auto_temperature_tenths);
   else if (ui_Label39) lv_label_set_text(ui_Label39, "--");
-  if (system_sample_flags & 2U) set_pressure_label(ui_Label46, auto_pressure);
-  else if (ui_Label46) lv_label_set_text(ui_Label46, "--");
+  set_pressure_label(ui_Label46, auto_pressure);
 }
 
 void command_parsing(
@@ -869,12 +906,16 @@ void screen_apply_system_state(const uint8_t *p, bool pending, uint8_t result)
   static uint8_t last_mode;
   const uint8_t state = p[12], mode = p[13];
   system_sample_flags = p[15];
+  system_treatment_running = state == APP_STATE_RUNNING;
   EYE_status = (p[14] == APP_EYE_NEW || p[14] == APP_EYE_IN_USE || p[14] == APP_EYE_SERVICE);
   eye_state_received = 1U;
   battery_percent = p[34]; battery_percent_valid = 1;
   hot_temperature_tenths = auto_temperature_tenths = (int16_t)Sw_Get16(p + 38) / 10;
-  pulsation_pressure = auto_pressure = Sw_Get16(p + 26) / 10U;
+  /* Keep the last valid display value during transient sample invalidity. */
+  if (system_sample_flags & 2U)
+    pulsation_pressure = auto_pressure = Sw_Get16(p + 26) / 10U;
   const bool open = state == APP_STATE_PREHEAT || state == APP_STATE_READY || state == APP_STATE_RUNNING;
+  backlight_treatment_open = open;
   const bool running = state == APP_STATE_RUNNING;
   HAL_TIM_Base_Stop_IT(&htim14);
   active_fault_code = Sw_Get16(p + 16);
@@ -885,13 +926,21 @@ void screen_apply_system_state(const uint8_t *p, bool pending, uint8_t result)
   }
   /* Use only glyphs included in popup40; the former arbitrary text rendered
    * missing-glyph boxes on the embedded build. */
-  const char *text = pending ? "..." : result == SW_OK ? "" :
+  const char *text = pending || result == SW_BUSY ? "..." : result == SW_OK ? "" :
       result == SW_STALE ? "请返回首页" : result == SW_NO_LINK ? "请检查主机连接" : "失败 请检查主机";
   if (ui_lang_get() == UI_LANG_EN) {
-    text = pending ? "Please wait..." : result == SW_OK ? "" :
+    text = pending || result == SW_BUSY ? "Please wait..." : result == SW_OK ? "" :
         result == SW_STALE ? "State changed" : result == SW_NO_LINK ? "Check link" : "Request rejected";
   }
+  if (!pending && result == SW_OK && lv_scr_act() == ui_Factorymode &&
+      (ScreenLink_LastCommand() == 0x9202 || ScreenLink_LastCommand() == 0x9203)) text = "OK";
   lv_label_set_text(request_label, text);
+  if (!pending && result == SW_OK && !open) {
+    if ((p[15] & 128U) && (lv_scr_act() == ui_setting || lv_scr_act() == ui_home_page))
+      _ui_screen_change(&ui_Factorymode, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Factorymode_screen_init);
+    else if (!(p[15] & 128U) && lv_scr_act() == ui_Factorymode)
+      _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
+  }
   if (open && mode >= 1 && mode <= 3) {
     if (mode == 1 && lv_scr_act() != ui_hotting)
       _ui_screen_change(&ui_hotting, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_hotting_screen_init);
@@ -914,19 +963,25 @@ void screen_apply_system_state(const uint8_t *p, bool pending, uint8_t result)
     else lv_obj_add_flag(start, LV_OBJ_FLAG_CLICKABLE);
     if (running) lv_obj_add_flag(stop, LV_OBJ_FLAG_CLICKABLE);
     else lv_obj_clear_flag(stop, LV_OBJ_FLAG_CLICKABLE);
-    uint32_t total_s = (Sw_Get32(p + 20) + 999U) / 1000U;
+    bool aging = running && Sw_Get32(p + 20) == UINT32_MAX;
+    uint32_t total_s = aging ? 0 : (Sw_Get32(p + 20) + 999U) / 1000U;
     minutes = (int)(total_s / 60U); seconds = (int)(total_s % 60U);
     lv_obj_t *min_label = mode == 1 ? ui_cut_d_l11 : mode == 2 ? ui_cut_d_l21 : ui_cut_d_l31;
     lv_obj_t *sec_label = mode == 1 ? ui_cut_d_l12 : mode == 2 ? ui_cut_d_l22 : ui_cut_d_l32;
-    lv_label_set_text_fmt(min_label, "%02d", minutes);
-    lv_label_set_text_fmt(sec_label, "%02d", seconds);
+    if (aging) {
+      lv_label_set_text(min_label, "--");
+      lv_label_set_text(sec_label, "--");
+    } else {
+      lv_label_set_text_fmt(min_label, "%02d", minutes);
+      lv_label_set_text_fmt(sec_label, "%02d", seconds);
+    }
   } else {
     work_mode = 0;
     if (last_mode) {
       bool current = (last_mode == 1 && lv_scr_act() == ui_hotting) ||
                      (last_mode == 2 && lv_scr_act() == ui_pulsationning) ||
                      (last_mode == 3 && lv_scr_act() == ui_autoing);
-      if (current) {
+      if (current && !pending && result == SW_OK) {
         minutes = seconds = 0;
         lv_label_set_text(last_mode == 1 ? ui_cut_d_l11 : last_mode == 2 ? ui_cut_d_l21 : ui_cut_d_l31, "00");
         lv_label_set_text(last_mode == 1 ? ui_cut_d_l12 : last_mode == 2 ? ui_cut_d_l22 : ui_cut_d_l32, "00");
@@ -938,7 +993,11 @@ void screen_apply_system_state(const uint8_t *p, bool pending, uint8_t result)
         lv_obj_add_flag(natural, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(p[18] == APP_STOP_NATURAL ? natural : manual, LV_OBJ_FLAG_HIDDEN);
       }
-    } else if (result != SW_OK && !pending && (lv_scr_act() == ui_hotting ||
+      /* Render the end of this session once. Later idle snapshots must not
+       * resurrect its popup after the user has entered the next preparation. */
+      if (!pending || !current) last_mode = 0U;
+    }
+    if (result != SW_OK && !pending && (lv_scr_act() == ui_hotting ||
                lv_scr_act() == ui_pulsationning || lv_scr_act() == ui_autoing)) {
       _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
     }

@@ -195,7 +195,7 @@ void ui_hotting_screen_init(void)
     lv_obj_clear_flag(ui_Image44, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
     ui_Slider9 = lv_slider_create(ui_battery8);
-    lv_slider_set_value(ui_Slider9, 4, LV_ANIM_OFF);
+    lv_slider_set_value(ui_Slider9, 0, LV_ANIM_OFF);
     if(lv_slider_get_mode(ui_Slider9) == LV_SLIDER_MODE_RANGE) lv_slider_set_left_value(ui_Slider9, 1, LV_ANIM_OFF);
     lv_obj_set_width(ui_Slider9, 47);
     lv_obj_set_height(ui_Slider9, 22);

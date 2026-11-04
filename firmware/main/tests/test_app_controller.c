@@ -70,7 +70,9 @@ static void count(AppMode mode) { if (mode != APP_MODE_NONE) treatment_count++; 
 static void screen_boot_sync(void) { }
 static uint16_t storage_read(uint8_t address, uint16_t fallback) { (void)address; return fallback; }
 static bool storage_write(uint8_t address, uint16_t value) { (void)address; (void)value; return true; }
-static void storage_erase(void) { }
+static unsigned storage_erase_count;
+static bool storage_erase_ok = true;
+static bool storage_erase(void) { storage_erase_count++; return storage_erase_ok; }
 static void screen_float(uint16_t command, float value)
 {
     if (command == 0x2055U) {
@@ -95,11 +97,12 @@ static void screen_u32(uint16_t command, uint32_t value)
 }
 static void fault(AppFault value) { (void)value; immediate_fault_count++; }
 
+static bool zero_cancel(void) { fake_zero_busy = 0; return true; }
 static const AppPort port = {
     now_ms, outputs_off, heat, pressure_start, pressure_step, pressure_stop,
     home_begin, home_poll, home_cancel, zero_calibrate, eye_read, eye_consume, power_read,
     power_off, led_set, count, screen_boot_sync, storage_read, storage_write,
-    storage_erase, storage_erase, screen_float, screen_u16, screen_u32, fault, NULL, NULL
+    storage_erase, storage_erase, screen_float, screen_u16, screen_u32, fault, NULL, NULL, zero_cancel
 };
 
 static void reset_fixture(void)
@@ -314,7 +317,7 @@ static void test_charge_done_uses_full_led(void)
 static void test_low_voltage_homes_then_cuts_power(void)
 {
     reset_fixture();
-    for (unsigned i = 0U; i < 5U; ++i) {
+    for (unsigned i = 0U; i < APP_LOW_BATTERY_CONFIRM_SAMPLES; ++i) {
         AppController_SetPower(false, false, 1U, 3150U);
     }
     assert(AppController_Status()->state == APP_STATE_HOMING);
@@ -334,23 +337,22 @@ static void test_low_voltage_during_treatment_waits_until_stop(void)
             assert(AppController_Prepare(modes[m], 350.0f));
             /* A partial pre-start confirmation must not survive treatment. */
             for (unsigned i = 0U; i < APP_LOW_BATTERY_CONFIRM_SAMPLES - 1U; ++i) {
-                AppController_SetPower(false, false, 1U, 3100U);
+                AppController_SetPower(false, false, 1U, 3150U);
             }
             assert(AppController_Start());
             for (unsigned i = 0U; i < APP_LOW_BATTERY_CONFIRM_SAMPLES * 2U; ++i) {
-                AppController_SetPower(false, false, 1U, 3100U);
+                AppController_SetPower(false, false, 1U, 3150U);
             }
             assert(AppController_Status()->state == APP_STATE_RUNNING);
             assert(AppController_Status()->low_battery_warning);
             assert(power_off_count == 0U);
             AppController_Stop(stops[s]);
             fake_home_result = APP_ASYNC_BUSY;
-            for (unsigned i = 0U; i < APP_LOW_BATTERY_CONFIRM_SAMPLES - 1U; ++i) {
-                AppController_SetPower(false, false, 1U, 3100U);
-            }
-            assert(AppController_Status()->stop_reason == stops[s]);
-            AppController_SetPower(false, false, 1U, 3100U);
-            assert(AppController_Status()->stop_reason == APP_STOP_LOW_BATTERY);
+            assert(AppController_Status()->battery_shutdown_pending);
+            assert(!AppController_CanQuickResume());
+            assert(!AppController_Prepare(modes[m], 350.0f));
+            /* Rebound after unloading must not cancel a confirmed shutdown. */
+            AppController_SetPower(false, false, 100U, 3700U);
             fake_home_result = APP_ASYNC_OK;
             AppController_Tick();
             assert(power_off_count == 1U);
@@ -364,7 +366,7 @@ static void test_preheat_low_voltage_still_shuts_down(void)
     reset_fixture();
     assert(AppController_Prepare(APP_MODE_HEAT, 0.0f));
     for (unsigned i = 0U; i < APP_LOW_BATTERY_CONFIRM_SAMPLES; ++i) {
-        AppController_SetPower(false, false, 1U, 3100U);
+        AppController_SetPower(false, false, 1U, 3150U);
     }
     assert(AppController_Status()->stop_reason == APP_STOP_LOW_BATTERY);
     AppController_Tick();
@@ -372,19 +374,19 @@ static void test_preheat_low_voltage_still_shuts_down(void)
     assert(power_off_count == 1U);
 }
 
-static void test_low_voltage_recovery_does_not_leave_pending_shutdown(void)
+static void test_low_voltage_rebound_keeps_pending_shutdown(void)
 {
     reset_fixture();
     assert(AppController_Prepare(APP_MODE_AUTO, 350.0f));
     assert(AppController_Start());
     for (unsigned i = 0U; i < APP_LOW_BATTERY_CONFIRM_SAMPLES * 2U; ++i) {
-        AppController_SetPower(false, false, 1U, 3100U);
+        AppController_SetPower(false, false, 1U, 3150U);
     }
     AppController_SetPower(false, false, 20U, 3700U);
     AppController_Stop(APP_STOP_USER);
     AppController_Tick();
-    assert(AppController_Status()->state == APP_STATE_IDLE);
-    assert(power_off_count == 0U);
+    assert(AppController_Status()->state == APP_STATE_SHUTDOWN);
+    assert(power_off_count == 1U);
 }
 
 static void test_power_loss_still_interrupts_running_treatment(void)
@@ -563,7 +565,7 @@ int main(void)
     test_low_voltage_homes_then_cuts_power();
     test_low_voltage_during_treatment_waits_until_stop();
     test_preheat_low_voltage_still_shuts_down();
-    test_low_voltage_recovery_does_not_leave_pending_shutdown();
+    test_low_voltage_rebound_keeps_pending_shutdown();
     test_power_loss_still_interrupts_running_treatment();
     test_fault_and_power_loss_always_home();
     test_pressure_control_preserves_hardware_fault_type();

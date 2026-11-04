@@ -21,6 +21,17 @@ static bool send(uint8_t type, uint16_t sequence, const uint8_t *p, uint8_t size
 }
 bool ScreenLink_Healthy(void) { return seen && HAL_GetTick() - last_snapshot < SW_TIMEOUT_MS; }
 bool ScreenLink_Pending(void) { return pending; }
+uint16_t ScreenLink_LastCommand(void) { return Sw_Get16(request + 8); }
+bool ScreenLink_CanPrepare(void)
+{
+    if (!ScreenLink_Healthy()) { result = SW_NO_LINK; dirty = true; return false; }
+    if (pending) return false;
+    if (snapshot[12] == APP_STATE_HOMING && (snapshot[15] & 16U)) return true;
+    if (snapshot[12] == APP_STATE_HOMING || snapshot[12] == APP_STATE_STOPPING) {
+        result = SW_BUSY; dirty = true; return false;
+    }
+    return snapshot[12] == APP_STATE_IDLE && (snapshot[15] & 4U) != 0U;
+}
 bool ScreenLink_IsTreatmentCommand(uint16_t cmd)
 {
     return cmd == 0x1041 || cmd == 0x1005 || cmd == 0x1037 || cmd == 0x1040 ||
@@ -30,6 +41,7 @@ bool ScreenLink_IsTreatmentCommand(uint16_t cmd)
 bool ScreenLink_Request(uint16_t cmd, float value, uint16_t duration_s)
 {
     if (!ScreenLink_Healthy()) { result = SW_NO_LINK; dirty = true; return false; }
+    if ((cmd == 0x1041 || cmd == 0x1005 || cmd == 0x1037) && !ScreenLink_CanPrepare()) return false;
     bool stop = cmd == 0x1030 || cmd == 0x1034 || cmd == 0x1038;
     if (pending && !stop) return false;
     /* A stop supersedes an in-flight start, and retries never re-send that start. */
@@ -56,12 +68,14 @@ static void receive(uint8_t type, uint16_t sequence, const uint8_t *p, uint8_t s
         if (seen && host == host_id && !Sw_IsNewer(sequence, snapshot_sequence)) return;
         if (host != host_id) { pending = false; stop_latched = false; result = SW_OK; }
         host_id = host; session_id = Sw_Get32(p + 4); snapshot_sequence = sequence;
+        if (!pending && result == SW_BUSY && p[12] != APP_STATE_HOMING && p[12] != APP_STATE_STOPPING &&
+            (Sw_Get16(request + 8) == 0x1041 || Sw_Get16(request + 8) == 0x1005 || Sw_Get16(request + 8) == 0x1037)) result = SW_OK;
         if (p[12] != APP_STATE_RUNNING && p[12] != APP_STATE_READY && p[12] != APP_STATE_PREHEAT) stop_latched = false;
         memcpy(snapshot, p, size); seen = true; last_snapshot = HAL_GetTick(); dirty = true;
     } else if (type == SW_RESULT && size == 8 && pending && sequence == request_sequence &&
                Sw_Get16(p) == Sw_Get16(request + 8)) {
         result = p[2]; pending = false; dirty = true;
-        if (result == SW_OK && Sw_Get16(p) >= 0x9101 && Sw_Get16(p) <= 0x9103) screen_config_saved();
+        if (result == SW_OK && ((Sw_Get16(p) >= 0x9101 && Sw_Get16(p) <= 0x9103) || Sw_Get16(p) == 0x9202 || Sw_Get16(p) == 0x9203)) screen_config_saved();
     }
 }
 void ScreenLink_Init(void)
@@ -81,7 +95,7 @@ void ScreenLink_Tick(void)
         p[10] = stop_latched; Sw_Put32(p + 11, stop_session);
         (void)send(SW_HEARTBEAT, 0, p, sizeof(p)); last_heartbeat = now;
     }
-    if (pending && now - sent_at >= 250U) {
+    if (pending && now - sent_at >= ((Sw_Get16(request + 8) == 0x9202 || Sw_Get16(request + 8) == 0x9203) ? 2500U : 250U)) {
         if (attempts >= 4 || !ScreenLink_Healthy()) {
             pending = false; result = SW_NO_LINK; dirty = true; g_screen_link_request_timeouts++;
         } else {

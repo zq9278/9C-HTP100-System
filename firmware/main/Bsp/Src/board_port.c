@@ -157,7 +157,8 @@ static const AppPort g_port = {
     .screen_u32 = ScreenProtocol_SendU32,
     .fault_report = board_fault_report,
     .pressure_sample_valid = TreatmentHw_PressureSampleValid,
-    .save_preset = StorageDriver_SavePreset
+    .save_preset = StorageDriver_SavePreset,
+    .pressure_zero_cancel = Ads1220Driver_ZeroCancel
 };
 
 bool Board_Init(void)

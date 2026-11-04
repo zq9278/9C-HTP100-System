@@ -112,7 +112,7 @@ void ui_pulsation_set_screen_init(void)
     lv_obj_clear_flag(ui_Image36, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
     ui_Slider5 = lv_slider_create(ui_battery1);
-    lv_slider_set_value(ui_Slider5, 4, LV_ANIM_OFF);
+    lv_slider_set_value(ui_Slider5, 0, LV_ANIM_OFF);
     if(lv_slider_get_mode(ui_Slider5) == LV_SLIDER_MODE_RANGE) lv_slider_set_left_value(ui_Slider5, 1, LV_ANIM_OFF);
     lv_obj_set_width(ui_Slider5, 47);
     lv_obj_set_height(ui_Slider5, 22);

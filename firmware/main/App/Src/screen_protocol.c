@@ -138,7 +138,7 @@ static void handle_work_frame(const uint8_t *frame)
     case 0x1050U:
         /* Language is deliberately the first response. The screen caches it
          * before LVGL creates its first visible frame. */
-        ScreenProtocol_SendU16(0x00ABU, AppController_StorageRead(0x06U, 0U));
+        ScreenProtocol_SendU16(0x00ABU, AppController_StorageRead(0x06U, PRODUCT_DEFAULT_LANGUAGE));
         ScreenProtocol_SendU16(0x00ADU, 1U);
         AppController_ScreenBoot();
         ScreenProtocol_SendU32(0x2060U, PRODUCT_VERSION_NUMBER);
@@ -206,7 +206,7 @@ static void handle_prepare_frame(const uint8_t *frame)
         if (value <= 1U) {
             (void)AppController_StorageWrite(0x06U, value);
         }
-        ScreenProtocol_SendU16(0x00ABU, AppController_StorageRead(0x06U, 0U));
+        ScreenProtocol_SendU16(0x00ABU, AppController_StorageRead(0x06U, PRODUCT_DEFAULT_LANGUAGE));
         break;
     default:
         /* Preset persistence is handled by the storage service, not the

@@ -7,8 +7,11 @@ void AppController_Init(const AppPort *port);
 void AppController_Tick(void);
 void AppController_SetScreenLinkHealthy(bool healthy);
 
+bool AppController_CanQuickResume(void);
+void AppController_PowerReadFailed(void);
 bool AppController_Prepare(AppMode mode, float pressure_mmhg);
 bool AppController_Start(void);
+bool AppController_StartAging(void);
 bool AppController_SavePreset(uint8_t preset, uint16_t pressure, uint16_t minutes);
 void AppController_Stop(AppStopReason reason);
 void AppController_RaiseFault(AppFault fault);
@@ -24,8 +27,10 @@ bool AppController_DebugMode(void);
 void AppController_ScreenBoot(void);
 uint16_t AppController_StorageRead(uint8_t address, uint16_t default_value);
 bool AppController_StorageWrite(uint8_t address, uint16_t value);
-void AppController_StorageEraseMain(void);
-void AppController_StorageEraseEye(void);
+void AppController_SetEngineeringMode(bool enabled);
+bool AppController_EngineeringMode(void);
+bool AppController_StorageEraseMain(void);
+bool AppController_StorageEraseEye(void);
 
 const AppSnapshot *AppController_Status(void);
 

@@ -8,6 +8,7 @@
 #include <string.h>
 static SwParser parser;
 static uint8_t down[256];
+static char logs[2048];
 static uint32_t owner, last_keepalive;
 static void receive(uint8_t type,uint16_t seq,const uint8_t *p,uint8_t n)
 {
@@ -40,6 +41,7 @@ static void receive(uint8_t type,uint16_t seq,const uint8_t *p,uint8_t n)
 void RttTuning_Init(void)
 {
     SEGGER_RTT_Init();
+    SEGGER_RTT_ConfigUpBuffer(1,"HTP100 logs",logs,sizeof(logs),SEGGER_RTT_MODE_NO_BLOCK_SKIP);
     SEGGER_RTT_ConfigDownBuffer(0,"HTP100 tuning",down,sizeof(down),SEGGER_RTT_MODE_NO_BLOCK_SKIP);
 }
 void RttTuning_Tick(void)

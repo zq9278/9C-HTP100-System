@@ -13,6 +13,6 @@ AppEyeState EyeDriver_ReadState(void);
 bool EyeDriver_InitialStateConfirmed(void);
 bool EyeDriver_LastProbeValid(void);
 bool EyeDriver_MarkConsumed(void);
-void EyeDriver_Erase(void);
+bool EyeDriver_Erase(void);
 
 #endif

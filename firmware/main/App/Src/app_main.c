@@ -133,6 +133,8 @@ void AppMain_Task(void *argument)
                 previous_external_power = charging;
                 external_power_seen = true;
                 AppController_SetPower(charging, full, soc, millivolts);
+            } else {
+                AppController_PowerReadFailed();
             }
         }
         if (Board_TakePowerLossEvent()) {

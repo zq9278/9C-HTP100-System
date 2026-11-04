@@ -22,10 +22,13 @@ uint16_t prepare_crimp = 200;
 uint16_t prepare_time = 5;
 uint16_t bee = 1;
 uint16_t prepare_set = 0;
+unsigned sim_beep_count, sim_request_count;
+uint16_t sim_last_command;
 
+bool ScreenLink_CanPrepare(void) { return true; }
 bool ScreenLink_Healthy(void) { return true; }
 bool ScreenLink_Pending(void) { return false; }
-bool ScreenLink_Request(uint16_t cmd, float value, uint16_t duration) { (void)cmd; (void)value; (void)duration; return true; }
+bool ScreenLink_Request(uint16_t cmd, float value, uint16_t duration) { sim_last_command = cmd; sim_request_count++; (void)value; (void)duration; return true; }
 void screen_refresh_prepare_ui(void) { ui_lang_update_preset_label(prepare_set); }
 void screen_refresh_runtime_ui(void) { screen_refresh_prepare_ui(); }
 void screen_reset_hotting_runtime_ui(void) {}
@@ -41,7 +44,7 @@ void HAL_GPIO_WritePin(int port, int pin, int state)
 
 void HAL_TIM_PWM_Start(TIM_HandleTypeDef *htim, int channel)
 {
-    (void)htim;
+    if (htim == &htim15) sim_beep_count++;
     (void)channel;
 }
 

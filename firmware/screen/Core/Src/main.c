@@ -254,6 +254,7 @@ int main(void)
             backlight_started = 1U;
         }
         lv_timer_handler();
+        screen_backlight_tick();
 		
     HAL_GPIO_TogglePin(GPIOH, GPIO_PIN_15);
 if (HAL_GetTick() - save_picture_time >= 1000) {

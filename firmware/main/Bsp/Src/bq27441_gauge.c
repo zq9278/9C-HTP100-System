@@ -316,12 +316,12 @@ bool Bq27441Gauge_Read(uint16_t *soc, uint16_t *millivolts)
         initialization_ready_logged = true;
     }
     if (
-        !gauge_read_word(BQ27441_REG_SOC, &raw_soc) ||
         !gauge_read_word(BQ27441_REG_VOLTAGE, &raw_voltage) ||
-        raw_soc > 100U || raw_voltage < 2500U || raw_voltage > 5000U) {
+        raw_voltage < 2500U || raw_voltage > 5000U) {
         return false;
     }
-    *soc = raw_soc;
+    if (!gauge_read_word(BQ27441_REG_SOC, &raw_soc)) raw_soc = UINT16_MAX;
+    *soc = raw_soc; /* Diagnostic only; never used for power decisions. */
     *millivolts = raw_voltage;
     return true;
 }

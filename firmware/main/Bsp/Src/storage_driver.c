@@ -218,10 +218,10 @@ uint16_t StorageDriver_BootLanguage(void)
      * Return the new-machine language now so the LCD never briefly applies an
      * old persisted language before that reset happens. */
     if (storage_program_reset_pending()) {
-        return 0U;
+        return PRODUCT_DEFAULT_LANGUAGE;
     }
 #endif
-    return StorageDriver_ReadU16(STORAGE_LANGUAGE_ADDRESS, 0U);
+    return StorageDriver_ReadU16(STORAGE_LANGUAGE_ADDRESS, PRODUCT_DEFAULT_LANGUAGE);
 }
 
 static bool config_value_valid(uint8_t address, uint16_t value)
@@ -278,7 +278,7 @@ static bool storage_initialize_screen_presets(void)
         uint8_t address;
         uint16_t value;
     } defaults[] = {
-        {STORAGE_LANGUAGE_ADDRESS, 0U},
+        {STORAGE_LANGUAGE_ADDRESS, PRODUCT_DEFAULT_LANGUAGE},
         {0x08U, 42U}, {0x0AU, 250U}, {0x0CU, 2U},
         {0x10U, 42U}, {0x12U, 350U}, {0x14U, 2U},
         {0x18U, 42U}, {0x1AU, 450U}, {0x1CU, 2U},
@@ -357,8 +357,11 @@ static bool storage_erase_main(void)
     bool success = true;
 
     for (uint16_t address = 0U; address < 256U; ++address) {
-        if (!ee_write_byte((uint8_t)address, 0xFFU)) {
+        uint8_t verify = 0;
+        if (!ee_write_byte((uint8_t)address, 0xFFU) ||
+            !ee_read_byte((uint8_t)address, &verify) || verify != 0xFFU) {
             success = false;
+            break;
         }
     }
     journal.loaded = false;
@@ -366,9 +369,9 @@ static bool storage_erase_main(void)
     return success;
 }
 
-void StorageDriver_EraseMain(void)
+bool StorageDriver_EraseMain(void)
 {
-    (void)storage_erase_main();
+    return storage_erase_main();
 }
 
 void StorageDriver_IncrementCounter(AppMode mode)

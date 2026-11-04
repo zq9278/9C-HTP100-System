@@ -10,6 +10,8 @@ bool ScreenLink_Healthy(void);
 bool ScreenLink_IsTreatmentCommand(uint16_t cmd);
 bool ScreenLink_Request(uint16_t cmd, float value, uint16_t duration_s);
 bool ScreenLink_Pending(void);
+uint16_t ScreenLink_LastCommand(void);
+bool ScreenLink_CanPrepare(void);
 /* Called only in the GUI/main loop, never from an interrupt. */
 void screen_apply_system_state(const uint8_t *snapshot, bool pending, uint8_t result);
 void screen_system_link_lost(void);

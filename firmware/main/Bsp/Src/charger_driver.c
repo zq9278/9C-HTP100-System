@@ -95,8 +95,6 @@ bool ChargerDriver_Read(bool *charging, bool *full, uint16_t *soc,
 {
     static uint8_t previous_status = 0xFFU;
     static uint8_t previous_vbus = 0xFFU;
-    static uint16_t last_valid_soc = 100U;
-    static uint16_t last_valid_millivolts;
     uint8_t charger = 0U;
     uint8_t vbus = 0U;
     uint8_t charge_state;
@@ -124,12 +122,9 @@ bool ChargerDriver_Read(bool *charging, bool *full, uint16_t *soc,
         previous_vbus = vbus;
     }
 
-    if (Bq27441Gauge_Read(&measured_soc, &measured_millivolts)) {
-        last_valid_soc = measured_soc;
-        last_valid_millivolts = measured_millivolts;
-    }
-    *soc = last_valid_soc;
-    *millivolts = last_valid_millivolts;
+    if (!Bq27441Gauge_Read(&measured_soc, &measured_millivolts)) return false;
+    *soc = measured_soc;
+    *millivolts = measured_millivolts;
     return true;
 }
 

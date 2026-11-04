@@ -171,6 +171,39 @@ static void save_framebuffer_bmp(const char *path)
 
 static void test_static_ui(void)
 {
+    extern unsigned sim_beep_count, sim_request_count;
+    extern volatile uint8_t work_mode;
+    extern uint16_t sim_last_command;
+    lv_obj_t *stop_buttons[] = {ui_Image5, ui_Image22, ui_Image55};
+    const uint16_t commands[] = {0x1030, 0x1034, 0x1038};
+    for (unsigned i = 0; i < 3; i++) {
+        work_mode = i + 1;
+        unsigned beeps = sim_beep_count, requests = sim_request_count;
+        bee = 1;
+        lv_event_send(stop_buttons[i], LV_EVENT_RELEASED, NULL);
+        assert(sim_beep_count == beeps + 1);
+        assert(sim_request_count == requests + 1 && sim_last_command == commands[i]);
+        bee = 0;
+        lv_event_send(stop_buttons[i], LV_EVENT_RELEASED, NULL);
+        assert(sim_beep_count == beeps + 1);
+        assert(sim_request_count == requests + 2);
+    }
+    work_mode = 0; bee = 1;
+    puts("PASS: three stop buttons beep once, mute still sends STOP");
+    lv_obj_t *engineering_before = lv_scr_act();
+    for (unsigned i=0;i<6;i++) formattee(NULL);
+    assert(sim_last_command == 0x9200);
+    assert(lv_scr_act() == engineering_before);
+    lv_textarea_set_text(ui_TextArea2, "250");
+    lv_event_send(ui_Panel6, LV_EVENT_RELEASED, NULL);
+    assert(sim_last_command == 0x9201 && lv_scr_act() == engineering_before);
+    lv_event_send(ui_Panel7, LV_EVENT_RELEASED, NULL);
+    assert(sim_last_command == 0x9202);
+    lv_event_send(ui_Panel8, LV_EVENT_RELEASED, NULL);
+    assert(sim_last_command == 0x9203);
+    lv_event_send(ui_Button17, LV_EVENT_RELEASED, NULL);
+    assert(sim_last_command == 0x9200 && lv_scr_act() == engineering_before);
+    puts("PASS: engineering buttons send versioned requests without speculative navigation");
     ui_lang_set(UI_LANG_EN);
     assert(lv_scr_act() == ui_Power_on_interface);
     ui_startup_finish();
@@ -198,6 +231,44 @@ static void test_static_ui(void)
     assert(strcmp(lv_label_get_text(ui_TextArea29), "Setting 3") == 0);
     _ui_screen_change(&ui_home_page, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_home_page_screen_init);
     puts("PASS: preset label geometry/text, language roundtrip, startup cancellation");
+    ui_battery_warning_update(true, false, false);
+    lv_obj_t *notice = lv_obj_get_child(lv_layer_top(), -1);
+    lv_obj_t *page_before = lv_scr_act();
+    unsigned battery_beeps = sim_beep_count;
+    bee = 1;
+    assert(!lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    lv_event_send(lv_obj_get_child(lv_obj_get_child(notice, 1), 1), LV_EVENT_CLICKED, NULL);
+    assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    assert(lv_scr_act() == page_before);
+    assert(sim_beep_count == battery_beeps + 1);
+    ui_battery_warning_update(true, false, false);
+    assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    ui_battery_warning_update(true, false, true);
+    ui_battery_warning_update(true, true, false);
+    assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    /* Recovery re-arms a later low-battery episode. */
+    ui_battery_warning_update(false, false, false);
+    ui_battery_warning_update(true, false, false);
+    assert(!lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    bee = 0;
+    lv_event_send(lv_obj_get_child(lv_obj_get_child(notice, 1), 1), LV_EVENT_CLICKED, NULL);
+    assert(sim_beep_count == battery_beeps + 1);
+    ui_battery_warning_update(true, false, false);
+    assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    bee = 1;
+    ui_battery_warning_update(false, false, false);
+    assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    ui_battery_warning_update(true, false, true);
+    assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    ui_battery_warning_update(true, true, true);
+    assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    /* Even if voltage recovers, deliver the deferred notice after RUNNING. */
+    ui_battery_warning_update(false, false, false);
+    assert(!lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    lv_event_send(lv_obj_get_child(lv_obj_get_child(notice, 1), 1), LV_EVENT_CLICKED, NULL);
+    ui_battery_warning_update(false, false, false);
+    assert(lv_obj_has_flag(notice, LV_OBJ_FLAG_HIDDEN));
+    puts("PASS: battery acknowledgement beeps respecting mute, acknowledged low stays dismissed across treatment and escalation, recovered deferred notice dismisses");
 }
 
 int main(int argc, char **argv)
@@ -232,6 +303,10 @@ int main(int argc, char **argv)
         }
     }
     if (getenv("SLK_SELF_TEST")) test_static_ui();
+    if (getenv("SLK_LOW_BATTERY")) {
+        ui_startup_finish();
+        ui_battery_warning_update(true, true, false);
+    }
     if (getenv("SLK_INVALID_SHIELD")) {
         ui_startup_finish();
         create_global_panel();

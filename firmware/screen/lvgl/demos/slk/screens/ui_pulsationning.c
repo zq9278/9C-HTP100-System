@@ -196,7 +196,7 @@ void ui_pulsationning_screen_init(void)
     lv_obj_clear_flag(ui_Image37, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
     ui_Slider6 = lv_slider_create(ui_battery5);
-    lv_slider_set_value(ui_Slider6, 4, LV_ANIM_OFF);
+    lv_slider_set_value(ui_Slider6, 0, LV_ANIM_OFF);
     if(lv_slider_get_mode(ui_Slider6) == LV_SLIDER_MODE_RANGE) lv_slider_set_left_value(ui_Slider6, 1, LV_ANIM_OFF);
     lv_obj_set_width(ui_Slider6, 47);
     lv_obj_set_height(ui_Slider6, 22);

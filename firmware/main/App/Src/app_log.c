@@ -7,6 +7,9 @@
 
 #include "stm32g0xx_hal.h"
 #include "usart.h"
+#if PRESSURE_JLINK_TUNING_ENABLE
+#include "SEGGER_RTT.h"
+#endif
 
 #define APP_LOG_BUFFER_SIZE       192U
 #define APP_LOG_UART_TIMEOUT_MS   30U
@@ -38,6 +41,9 @@ void AppLog_WriteRaw(const char *data, size_t length)
     if (length > UINT16_MAX) {
         length = UINT16_MAX;
     }
+#if PRESSURE_JLINK_TUNING_ENABLE
+    (void)SEGGER_RTT_Write(1, data, (unsigned)length);
+#endif
     size_t free_bytes = (tx_read + sizeof(tx_ring) - tx_write - 1U) % sizeof(tx_ring);
     if (length > free_bytes) { g_log_dropped_records++; return; }
     for (size_t i = 0; i < length; ++i) {

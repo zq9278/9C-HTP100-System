@@ -25,6 +25,8 @@ typedef struct {
     bool charging;
     bool charge_full;
     bool low_battery_warning;
+    bool battery_shutdown_pending;
+    uint8_t battery_level;
     bool home_valid;
     bool pressure_zero_valid;
     uint16_t battery_soc;

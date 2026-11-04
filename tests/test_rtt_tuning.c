@@ -8,6 +8,7 @@
 static uint32_t now;static uint8_t incoming[64],reply[64];static size_t count;
 uint32_t HAL_GetTick(void){return now;}
 void SEGGER_RTT_Init(void){}
+int SEGGER_RTT_ConfigUpBuffer(unsigned a,const char*b,void*c,unsigned d,unsigned e){assert(a==1);assert(d>=1024);(void)b;(void)c;(void)e;return 0;}
 int SEGGER_RTT_ConfigDownBuffer(unsigned a,const char*b,void*c,unsigned d,unsigned e){(void)a;(void)b;(void)c;(void)d;(void)e;return 0;}
 unsigned SEGGER_RTT_Read(unsigned a,void*b,unsigned n){(void)a;assert(count<=n);memcpy(b,incoming,count);unsigned r=(unsigned)count;count=0;return r;}
 unsigned SEGGER_RTT_Write(unsigned a,const void*b,unsigned n){(void)a;memcpy(reply,b,n);return n;}

@@ -35,6 +35,8 @@ def main():
             raise SystemExit('Missing J-Link runtime component: ' + name)
     if not args.skip_build:
         subprocess.run([sys.executable, str(ROOT / 'scripts/build.py'), '--preset', 'Release'], cwd=ROOT, check=True)
+    subprocess.run([sys.executable, str(ROOT / 'scripts/build.py'), '--board', 'main', '--preset', 'Tuning'], cwd=ROOT, check=True)
+    subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', '--name', 'htp-rtt-bridge', '--distpath', str(ROOT / '.cache/rtt-dist'), '--workpath', str(ROOT / '.cache/rtt-build'), '--specpath', str(ROOT / '.cache'), '--collect-all', 'pylink', str(ROOT / 'tools/pressure_tuner/rtt_bridge.py')], cwd=ROOT, check=True)
     images = {role: inspect(role, 'Release') for role in ('main', 'screen-new', 'screen-old')}
     # One distributable must contain one matched firmware release.
     if len({i['git_commit'] for i in images.values()}) != 1:
@@ -51,7 +53,7 @@ def main():
         default_app.unlink()
     application = destination / 'resources/app'
     application.mkdir()
-    for name in ('main.js', 'backend.cjs', 'preload.js', 'renderer.js', 'index.html', 'style.css'):
+    for name in ('main.js', 'backend.cjs', 'preferences.cjs', 'preload.js', 'renderer.js', 'index.html', 'style.css', 'rtt.cjs', 'rtt.html', 'rtt-ui.js'):
         shutil.copy2(APP / name, application / name)
     (application / 'package.json').write_text(json.dumps({k: package[k] for k in ('name', 'version', 'main')}) + '\n', encoding='utf-8')
     payload = destination / 'resources/payload'
@@ -62,15 +64,25 @@ def main():
         info.pop('path', None)
         # ELF and app-only files are deliberately not distribution inputs.
         info.pop('files', None)
+    tuning = inspect('main', 'Tuning')
+    shutil.copy2(tuning.pop('path'), firmware / 'main-tuning.hex')
+    tuning['file'] = 'main-tuning.hex'
+    tuning.pop('files', None)
+    shutil.copy2(ROOT / '.cache/rtt-dist/htp-rtt-bridge.exe', payload / 'htp-rtt-bridge.exe')
     runtime = payload / 'jlink'
     shutil.copytree(args.jlink, runtime, ignore=shutil.ignore_patterns('Uninstall.exe', '*.log'))
+    # Both supported STM32 devices and the selected QSPI loader are built in.
+    # Do not distribute a developer-installed third-party device database:
+    # its relative loader paths are unrelated to this product and not portable.
+    (runtime / 'JLinkDevices.xml').write_text('<DataBase />\n', encoding='utf-8')
     inventory = {p.relative_to(payload).as_posix(): sha(p) for p in sorted(runtime.rglob('*')) if p.is_file()}
-    bundle = {'version': package['version'], 'built_at': stamp, 'images': images, 'runtime': inventory}
+    inventory['htp-rtt-bridge.exe'] = sha(payload / 'htp-rtt-bridge.exe')
+    bundle = {'tuning': tuning, 'version': package['version'], 'built_at': stamp, 'images': images, 'runtime': inventory}
     (payload / 'bundle.json').write_text(json.dumps(bundle, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     shutil.copy2(APP / 'DISTRIBUTION.md', destination / '使用说明.txt')
     shutil.copy2(args.jlink / 'Doc/LicenseIncGUI.txt', destination / 'SEGGER-LICENSE.txt')
     # Read every bundled firmware back before distributing the archive.
-    for info in images.values():
+    for info in list(images.values()) + [tuning]:
         if sha(firmware / info['file']) != info['sha256']:
             raise SystemExit('Copied firmware hash mismatch: ' + info['file'])
     archive = destination.parent / (destination.name + '.zip')

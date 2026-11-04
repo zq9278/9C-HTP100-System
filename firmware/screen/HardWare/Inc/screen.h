@@ -67,6 +67,8 @@ uint8_t screen_start_ack_received(void);
 uint8_t screen_start_language_received(void);
 void screen_refresh_prepare_ui(void);
 void screen_refresh_runtime_ui(void);
+bool screen_backlight_touch(bool pressed);
+void screen_backlight_tick(void);
 void screen_fault_popup_tick(void);
 void screen_reset_hotting_runtime_ui(void);
 void screen_reset_pulsationning_runtime_ui(void);

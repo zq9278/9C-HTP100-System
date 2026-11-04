@@ -5,18 +5,21 @@
 <header><div class="eyebrow">9C · HTP100</div><h1>固件烧录</h1><p id="intro">选择控制板，通过 J-Link 下载并校验。</p></header>
 <main>
 <section><h2>01　选择烧录对象</h2><div class="targets">
-<label class="target"><input type="radio" name="role" value="main" checked><span><b>主机控制板</b><small>STM32G070 · 主机程序</small></span></label>
-<label class="target"><input type="radio" name="role" value="screen-new"><span><b>新屏幕</b><small>新 LCD 初始化 · BOOT＋程序</small></span></label>
-<label class="target"><input type="radio" name="role" value="screen-old"><span><b>旧屏幕</b><small>旧 LCD 初始化 · BOOT＋程序</small></span></label>
+<label class="target"><input type="radio" name="role" value="main" checked><span><b>主机</b><small>STM32G070 · 主机程序</small></span></label>
+<div class="screen-target"><label class="target"><input type="radio" name="role" value="screen"><span><b>屏幕</b><small>BOOT＋屏幕程序</small></span></label>
+<div id="screen-variants" class="screen-variants" role="group" aria-label="屏幕类型" hidden>
+<label><input type="radio" name="panel" value="screen-new" checked>新屏幕</label>
+<label><input type="radio" name="panel" value="screen-old">旧屏幕</label>
+</div></div>
 </div><p id="target-note" class="note"></p>
 <div class="row"><label id="preset-label">构建版本 <select id="preset"><option>Release</option><option>Debug</option><option>Tuning</option></select></label><label id="rebuild-label" class="check"><input id="rebuild" type="checkbox" checked> 烧录前重新编译最新代码</label><button id="output" class="quiet">打开固件目录</button></div>
 </section>
 <section><h2>02　烧录设置</h2><div class="row" id="tool-row"><label class="grow">J-Link Commander <input id="jlink" type="text" placeholder="自动检测 JLink.exe"></label><button id="browse" class="quiet">选择程序</button></div>
-<div class="row"><label>探针序列号 <input id="serial" type="text" inputmode="numeric" placeholder="单探针可留空"></label><label>SWD 速度 <select id="speed"><option value="1000">1000 kHz</option><option value="4000">4000 kHz</option></select></label><p class="note">连接对应控制板，停止治疗并关闭其他调试会话。</p></div>
+<div class="row"><label>探针序列号 <input id="serial" type="text" inputmode="numeric" placeholder="单探针可留空"></label><label>SWD 速度 <select id="speed"><option value="1000">1000 kHz</option><option value="4000">4000 kHz</option><option value="8000">8000 kHz</option></select></label><p class="note">连接对应控制板，停止治疗并关闭其他调试会话。</p></div>
 </section>
 <section><div class="row spread"><h2>03　固件与下载</h2><span id="status" role="status">就绪</span></div><div id="package" class="package">正在读取固件信息…</div>
-<div class="actions"><button id="driver" class="quiet">安装 J-Link 驱动</button><button id="build" class="secondary">仅编译并生成固件</button><button id="flash" class="primary">编译并烧录</button></div>
-<progress id="progress" hidden></progress><details id="logs"><summary>执行日志</summary><pre id="log" aria-live="polite">启动时不会连接探针或烧录设备。</pre></details></section>
+<div class="actions"><button id="rtt-open" class="quiet">RTT 调试</button><button id="driver" class="quiet">安装 J-Link 驱动</button><button id="build" class="secondary">仅编译并生成固件</button><button id="flash" class="primary">编译并烧录</button></div>
+<div id="flash-progress" hidden><p id="flash-progress-text" role="status"></p><progress id="flash-bar" max="4" value="0" aria-label="??????"></progress></div><progress id="progress" hidden></progress><details id="logs"><summary>执行日志</summary><pre id="log" aria-live="polite">启动时不会连接探针或烧录设备。</pre></details></section>
 </main><footer id="root"></footer>
 <dialog id="success-dialog"><div class="success-mark">✓</div><h2>烧录成功</h2><p id="success-detail"></p><p>固件下载与校验已完成，已发送复位运行命令。</p><button id="success-close" class="primary">确定</button></dialog>
 <script src="renderer.js"></script></body></html>

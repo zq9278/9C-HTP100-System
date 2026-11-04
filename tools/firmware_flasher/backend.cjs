@@ -12,7 +12,7 @@ const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).d
 function validate(options) {
   if (!options || !ROLES.includes(options.role) || !PRESETS.includes(options.preset)) throw Error('请选择有效的板型和构建版本');
   if (options.serial && !/^\d{1,12}$/.test(options.serial)) throw Error('探针序列号只能填写数字');
-  if (options.speed && !['1000', '4000'].includes(String(options.speed))) throw Error('无效的 SWD 速度');
+  if (options.speed && !['1000', '4000', '8000'].includes(String(options.speed))) throw Error('无效的 SWD 速度');
 }
 
 function findJLink() {
@@ -82,9 +82,10 @@ class Programmer {
   async inspect(options) {
     validate(options);
     if (this.bundle) {
-      if (options.preset !== 'Release') throw Error('分发版只提供内置 Release 固件');
-      const info = this.bundle.images[options.role];
-      if (!info || info.role !== options.role || info.preset !== 'Release' || info.file !== options.role + '.hex'
+      if (options.preset !== 'Release' && !(options.role === 'main' && options.preset === 'Tuning' && this.bundle.tuning)) throw Error('分发版只提供内置 Release 固件');
+      const tuning = options.role === 'main' && options.preset === 'Tuning';
+      const info = tuning ? this.bundle.tuning : this.bundle.images[options.role];
+      if (!info || info.role !== options.role || info.preset !== options.preset || info.file !== (tuning ? 'main-tuning.hex' : options.role + '.hex')
           || info.lcd_panel !== (options.role === 'main' ? null : options.role.split('-')[1].toUpperCase())) throw Error('内置固件清单与板型不匹配');
       const file = this.bundledFile('firmware/' + info.file);
       if (hash(file) !== info.sha256) throw Error('内置固件损坏，请重新解压软件包');
@@ -103,8 +104,9 @@ class Programmer {
     return this.inspect(options);
   }
   build(options, log = () => {}) {return this.exclusive(() => this.compile(options, log));}
-  flash(options, log = () => {}) {
+  flash(options, log = () => {}, progress = () => {}) {
     return this.exclusive(async () => {
+      progress(1);
       validate(options);
       if (this.bundle && options.rebuild) throw Error('分发版不能重新编译，请使用内置固件');
       this.verifyRuntime();
@@ -118,7 +120,14 @@ class Programmer {
         if (hash(firmware) !== info.sha256) throw Error('固件在检查后发生变化，请重新构建');
         const script = path.join(folder, 'program.jlink'); fs.writeFileSync(script, commandScript(options.role), 'ascii');
         log(`开始下载并校验：${options.role}\nSHA-256 ${info.sha256}\n`);
-        const output = await this.runner(executable, commandArgs(options, script), {cwd: folder, log});
+        progress(2);
+        let tail = '', downloading = false;
+        const downloadLog = text => {
+          tail = (tail + text).slice(-4096);
+          if (!downloading && /Downloading file/i.test(tail)) { downloading = true; progress(3); }
+          log(text);
+        };
+        const output = await this.runner(executable, commandArgs(options, script), {cwd: folder, log: downloadLog});
         if (!/Downloading file[^]*?\bO\.K\./i.test(output) || /(?:^|\n)\s*(?:ERROR\s*[:!]|Cannot connect|Failed to)/i.test(output)) throw Error('未收到完整下载成功回执，请检查 J-Link 日志');
         log('下载及 J-Link 内置校验完成，已请求复位运行。\n');
         return info;

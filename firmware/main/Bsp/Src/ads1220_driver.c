@@ -26,6 +26,7 @@
 static int32_t g_zero_raw;
 static int32_t g_sensor_diagnostic_raw;
 static bool g_zero_valid;
+static bool g_zero_active, g_previous_zero_valid;
 static bool g_ready;
 
 static HAL_StatusTypeDef ads_command(uint8_t command)
@@ -240,23 +241,23 @@ Ads1220Result Ads1220Driver_ZeroPoll(bool begin)
     static int32_t samples[32];
     static uint8_t count;
     static uint32_t settle_started;
-    static bool active;
     int64_t sum = 0;
 
     if (begin) {
-        active = false;
+        g_zero_active = false;
         count = 0;
+        g_previous_zero_valid = g_zero_valid;
         g_zero_valid = false;
         Ads1220Result sensor_result = Ads1220Driver_CheckSensor();
         if (sensor_result != ADS1220_RESULT_OK) return sensor_result;
         settle_started = HAL_GetTick();
-        active = true;
+        g_zero_active = true;
         return ADS1220_RESULT_BUSY;
     }
-    if (!active) return ADS1220_RESULT_COMM;
+    if (!g_zero_active) return ADS1220_RESULT_COMM;
     if (HAL_GetTick() - settle_started < 500U) return ADS1220_RESULT_BUSY;
     if (!Ads1220Driver_ReadRaw(&samples[count])) {
-        active = false;
+        g_zero_active = false;
         return ADS1220_RESULT_COMM;
     }
     for (uint8_t position = count;
@@ -266,7 +267,7 @@ Ads1220Result Ads1220Driver_ZeroPoll(bool begin)
         samples[position - 1U] = temporary;
     }
     if (++count < 32U) return ADS1220_RESULT_BUSY;
-    active = false;
+    g_zero_active = false;
     /* Lower ADC counts mean higher pressure. The former positive delta was
      * clamped to zero by PressureFromRaw, masking unstable calibration. */
     if (Ads1220Driver_PressureFromRaw(g_zero_raw - (samples[27] - samples[4]),
@@ -284,6 +285,14 @@ Ads1220Result Ads1220Driver_ZeroPoll(bool begin)
     LOG_PRESSURE_DIAG("[ADS1220] Zero calibrated: raw=%ld low=%ld high=%ld",
          (long)g_zero_raw, (long)samples[4], (long)samples[27]);
     return ADS1220_RESULT_OK;
+}
+
+bool Ads1220Driver_ZeroCancel(void)
+{
+    if (!g_zero_active || !g_previous_zero_valid) return false;
+    g_zero_active = false;
+    g_zero_valid = true; /* g_zero_raw changes only after a complete calibration. */
+    return true;
 }
 
 bool Ads1220Driver_ZeroValid(void)

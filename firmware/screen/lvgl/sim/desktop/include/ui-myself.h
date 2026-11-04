@@ -6,6 +6,7 @@
 #include "lvgl.h"
 void create_global_panel(void);
 void global_panel_set_content(const char *, const char *);
+void ui_battery_warning_update(bool low, bool shutdown, bool running);
 
 #define AXI_SRAM
 

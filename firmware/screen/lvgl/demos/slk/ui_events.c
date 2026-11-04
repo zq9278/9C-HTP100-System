@@ -24,7 +24,7 @@ extern int value3;
 extern int value4;
 extern uint8_t usart1_tx;
 extern uint16_t prepare_set, bee, prepare_time, prepare_crimp;
-uint16_t language = UI_LANG_ZH;
+uint16_t language = UI_LANG_EN;
 // extern DMA_HandleTypeDef hdma_usart1_tx;
 volatile uint8_t work_mode =
     0; // 0:娌″伐浣溿€?1锛氱儹鏁枫€?2锛氳剦鍐层€?3锛氳嚜鍔?
@@ -74,7 +74,7 @@ void auto_start_on(lv_event_t *e) {
 }
 char buffer[10]; // 预留足够空间
 void auto_set_value(lv_event_t *e) {
-  if (work_mode == 0) {
+  if (work_mode == 0 && ScreenLink_CanPrepare()) {
     lv_obj_set_style_text_color(ui_Label46, lv_color_make(255, 255, 255), 0); // 白色
     lv_obj_clear_flag(ui_Image55, LV_OBJ_FLAG_CLICKABLE); // 禁用点击
     // ui_auto_count_screen_init();
@@ -139,7 +139,7 @@ void auto_set_value(lv_event_t *e) {
   }
 }
 void hot_start(lv_event_t *e) {
-  if(work_mode == 0 && ScreenLink_Healthy() && !ScreenLink_Pending()) {
+  if(work_mode == 0 && ScreenLink_CanPrepare()) {
     _ui_screen_change(&ui_hotting, LV_SCR_LOAD_ANIM_NONE, 0, 0,
                         &ui_hotting_screen_init);
  lv_obj_clear_flag(ui_Image5, LV_OBJ_FLAG_CLICKABLE); // 禁用点击
@@ -170,7 +170,7 @@ void hot_start(lv_event_t *e) {
  
 }
 void pulsation_start(lv_event_t *e) {
-  if(work_mode == 0 && ScreenLink_Healthy() && !ScreenLink_Pending()) {
+  if(work_mode == 0 && ScreenLink_CanPrepare()) {
     lv_obj_set_style_text_color(ui_Label32, lv_color_make(255, 255, 255), 0); // 白色
     _ui_screen_change(&ui_pulsationning, LV_SCR_LOAD_ANIM_NONE, 0, 0,
                         &ui_pulsationning_screen_init);
@@ -204,7 +204,7 @@ void pulsation_start(lv_event_t *e) {
 
 }
 void auto_start(lv_event_t *e) {
-  if(work_mode == 0 && ScreenLink_Healthy() && !ScreenLink_Pending()) {
+  if(work_mode == 0 && ScreenLink_CanPrepare()) {
     _ui_screen_change(&ui_autoing, LV_SCR_LOAD_ANIM_NONE, 0, 0,
                         &ui_autoing_screen_init);
   
@@ -237,16 +237,22 @@ void auto_start(lv_event_t *e) {
 }
 }
 void hot_stop(lv_event_t *e) {
-  (void)e;
-  if (work_mode == 1) (void)ScreenLink_Request(0x1030, 0, 0);
+  if (work_mode == 1) {
+    BEE1(e);
+    (void)ScreenLink_Request(0x1030, 0, 0);
+  }
 }
 void pulsation_stop(lv_event_t *e) {
-  (void)e;
-  if (work_mode == 2) (void)ScreenLink_Request(0x1034, 0, 0);
+  if (work_mode == 2) {
+    BEE1(e);
+    (void)ScreenLink_Request(0x1034, 0, 0);
+  }
 }
 void auto_stop(lv_event_t *e) {
-  (void)e;
-  if (work_mode == 3) (void)ScreenLink_Request(0x1038, 0, 0);
+  if (work_mode == 3) {
+    BEE1(e);
+    (void)ScreenLink_Request(0x1038, 0, 0);
+  }
 }
 void prepare_set1(lv_event_t *e) {
   if (prepare_set == 1) {
@@ -499,94 +505,25 @@ void save_prepare_set_pre(lv_event_t *e) {
 }
 uint8_t formattee_value = 0;
 void formattee(lv_event_t *e) {
-  if (formattee_value == 5) {
-      _ui_screen_change(&ui_Factorymode, LV_SCR_LOAD_ANIM_NONE, 0, 0,
-                        &ui_Factorymode_screen_init);
-    BEE1(e);
+  if (++formattee_value >= 6) {
     formattee_value = 0;
-		work_mode = 0;
-		lv_obj_clear_flag(
-        ui_Image75,
-        LV_OBJ_FLAG_HIDDEN); 
+    BEE1(e);
+    (void)ScreenLink_Request(0x9200, 1, 0);
   }
-  formattee_value += 1;
 }
 void work_mode_0(lv_event_t *e) { work_mode = 0; }
-void Factorymodecall(lv_event_t * e)
-{
-      minutes = 0;
-  seconds = 0;
-  lv_label_set_text_fmt(ui_cut_d_l31, "%02d", minutes); // 鏄剧ず鍒嗛挓
-  lv_label_set_text_fmt(ui_cut_d_l32, "%02d", 0);       // 鏄剧ず绉掗拡
-  screen_reset_autoing_runtime_ui();
-
- 	float press_value = atof(lv_textarea_get_text(ui_TextArea2)); // 获取当前值
-  //float tempature_value = atof(lv_textarea_get_text(ui_TextArea9)); // 获取当前值
-float tempature_value = 42.5; // 获取当前值
-      work_mode = 3;
-      BEE1(e);
-      _ui_screen_change(&ui_autoing, LV_SCR_LOAD_ANIM_NONE, 0, 0,
-                        &ui_autoing_screen_init);
-      screen_reset_autoing_runtime_ui();
-      volatile static AXI_SRAM  CTRL_MSG pData;
-      pData.cmd_head_high = 0x5A;
-      pData.cmd_head_low = 0xA5;
-      pData.frame_length = 0x0d;
-      pData.cmd_type_high = 0x10;
-      pData.cmd_type_low = 0x53;
-      pData.data = tempature_value * 1.0;
-      pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-      pData.end_high = 0xff; // 甯у熬 // 甯у熬
-      pData.end_low = 0xff;  // 甯у熬
-      UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-pData.cmd_type_low = 0x54;
-      pData.data = press_value * 1.0;
-      pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-      pData.end_high = 0xff; // 甯у熬 // 甯у熬
-      pData.end_low = 0xff;  // 甯у熬
-      UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-      pData.cmd_type_low = 0x55;
-      pData.data =   1.0;
-      pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-      pData.end_high = 0xff; // 甯у熬 // 甯у熬
-      pData.end_low = 0xff;  // 甯у熬
-      UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-			//HAL_NVIC_DisableIRQ(TIM14_IRQn);
-
-
-
-}
-
-void eyeclear(lv_event_t * e)
-{
-	BEE1(e);
-		volatile static AXI_SRAM prepare_data pData;
-    pData.cmd_head_high = 0x6A;
-    pData.cmd_head_low = 0xA6;
-    pData.frame_length = 0x0b;
-    pData.cmd_type_high = 0x10;
-    pData.cmd_type_low = 0x47;
-    pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-    pData.end_high = 0xff; // 甯у熬 // 甯у熬
-    pData.end_low = 0xff;  // 甯у熬
-    // SCB_CleanInvalidateDCache();
-    UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
-}
-
-void setclear(lv_event_t * e)
-{
+void Factorymodecall(lv_event_t *e) {
   BEE1(e);
-	volatile static AXI_SRAM prepare_data pData;
-    pData.cmd_head_high = 0x6A;
-    pData.cmd_head_low = 0xA6;
-    pData.frame_length = 0x0b;
-    pData.cmd_type_high = 0x10;
-    pData.cmd_type_low = 0x46;
-    pData.crc = Calculate_CRC((uint8_t *)&pData, sizeof(pData) - 4);
-    pData.end_high = 0xff; // 甯у熬 // 甯у熬
-    pData.end_low = 0xff;  // 甯у熬
-    // SCB_CleanInvalidateDCache();
-    UART_TransmitWithRetry(&huart1, (uint8_t *)&pData, sizeof(pData));
+  float pressure = atof(lv_textarea_get_text(ui_TextArea2));
+  (void)ScreenLink_Request(0x9201, pressure, 0);
+}
+void eyeclear(lv_event_t *e) {
+  BEE1(e);
+  (void)ScreenLink_Request(0x9203, 0, 0);
+}
+void setclear(lv_event_t *e) {
+  BEE1(e);
+  (void)ScreenLink_Request(0x9202, 0, 0);
 }
 
 void pressset(lv_event_t * e)

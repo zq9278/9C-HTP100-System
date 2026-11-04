@@ -20,6 +20,7 @@ bool Ads1220Driver_Ready(void);
 bool Ads1220Driver_ReadRaw(int32_t *raw);
 Ads1220Result Ads1220Driver_CheckSensor(void);
 Ads1220Result Ads1220Driver_ZeroPoll(bool begin);
+bool Ads1220Driver_ZeroCancel(void);
 bool Ads1220Driver_ZeroValid(void);
 int32_t Ads1220Driver_ZeroRaw(void);
 float Ads1220Driver_PressureFromRaw(int32_t raw, float target_mmhg);

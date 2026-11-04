@@ -39,14 +39,15 @@ typedef struct {
     void (*screen_boot_sync)(void);
     uint16_t (*storage_read_u16)(uint8_t address, uint16_t default_value);
     bool (*storage_write_u16)(uint8_t address, uint16_t value);
-    void (*storage_erase_main)(void);
-    void (*storage_erase_eye)(void);
+    bool (*storage_erase_main)(void);
+    bool (*storage_erase_eye)(void);
     void (*screen_float)(uint16_t command, float value);
     void (*screen_u16)(uint16_t command, uint16_t value);
     void (*screen_u32)(uint16_t command, uint32_t value);
     void (*fault_report)(AppFault fault);
     bool (*pressure_sample_valid)(void);
     bool (*save_preset)(uint8_t preset, uint16_t pressure, uint16_t minutes);
+    bool (*pressure_zero_cancel)(void);
 } AppPort;
 
 #endif
