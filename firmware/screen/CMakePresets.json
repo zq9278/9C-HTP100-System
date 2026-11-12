@@ -50,6 +50,20 @@
             "cacheVariables": {
                 "HTP_LCD_PANEL": "OLD"
             }
+        },
+        {
+            "name": "DebugNov11",
+            "inherits": "Debug",
+            "cacheVariables": {
+                "HTP_LCD_PANEL": "NOV11"
+            }
+        },
+        {
+            "name": "ReleaseNov11",
+            "inherits": "Release",
+            "cacheVariables": {
+                "HTP_LCD_PANEL": "NOV11"
+            }
         }
     ],
     "buildPresets": [

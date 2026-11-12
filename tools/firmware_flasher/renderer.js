@@ -6,7 +6,7 @@ function flashProgress(step) {
   $('flash-bar').value = step;
   $('flash-progress-text').textContent = ['','1/4 · 准备固件','2/4 · 连接设备','3/4 · 下载及校验中，请勿断开连接','4/4 · 烧录完成'][step];
 }
-const roleNames = {'main':'主机控制板','screen-new':'新屏幕','screen-old':'旧屏幕'};
+const roleNames = {'main':'主机控制板','screen-new':'新屏幕','screen-old':'旧屏幕','screen-nov11':'11月11日更新屏幕程序'};
 function savePreferences() {
   if (!ready) return;
   const value = {...options(), target: document.querySelector('[name=role]:checked').value,
@@ -31,7 +31,7 @@ function render() {
   $('progress').hidden = !busy || flashActive;
   const role = options().role;
   $('screen-variants').hidden = role === 'main';
-  $('target-note').textContent = role === 'main' ? (bundled ? '内置主机 Release 固件，连接主机控制板后烧录。' : '主机固件独立下载；Tuning 版本支持临时压力调参。') : `${role === 'screen-new' ? '新' : '旧'} LCD 驱动，内部 BOOT 与外部屏幕程序合并为一个 HEX。两种屏幕都包含 BOOT。`;
+  $('target-note').textContent = role === 'main' ? (bundled ? '内置主机 Release 固件，连接主机控制板后烧录。' : '主机固件独立下载；Tuning 版本支持临时压力调参。') : `${roleNames[role]} LCD 驱动，内部 BOOT 与外部屏幕程序合并为一个 HEX。三种屏幕都包含 BOOT。`;
 }
 function log(text) {const p = $('log');p.textContent = (p.textContent + text).slice(-100000);p.scrollTop = p.scrollHeight;}
 function show(info) {$('package').textContent = `${info.file}  ·  ${info.preset}  ·  LCD: ${info.lcd_panel || '不适用'}\n提交 ${info.git_commit.slice(0, 12)}${info.dirty ? '（含本地修改）' : ''}  ·  ${new Date(info.built_at).toLocaleString()}\nSHA-256  ${info.sha256}\n${info.path}`;}

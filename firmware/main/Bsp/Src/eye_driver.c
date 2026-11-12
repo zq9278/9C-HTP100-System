@@ -79,7 +79,7 @@ static HAL_StatusTypeDef i2c2_mem_read(uint16_t device, uint16_t address,
     for (uint8_t attempt = 0U; attempt < 2U; ++attempt) {
         status = HAL_I2C_Mem_Read(&hi2c2, device, address, I2C_MEMADD_SIZE_8BIT,
                                   data, size, timeout);
-        if (device == TMP112_ADDRESS) {
+        if (APP_ENABLE_TMP112_DIAGNOSTICS && device == TMP112_ADDRESS) {
             uint32_t error = HAL_I2C_GetError(&hi2c2);
             if (status == HAL_OK && size == 2U) {
                 LOGI("[TMP112 READ] reg=0x%02X attempt=%u status=%u err=0x%08lX raw=%02X %02X",

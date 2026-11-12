@@ -86,13 +86,19 @@ void LCD_WriteData(uint8_t data)
 #ifndef HTP_LCD_NEW
 #define HTP_LCD_NEW 1
 #endif
-#if HTP_LCD_NEW != 0 && HTP_LCD_NEW != 1
-#error HTP_LCD_NEW must be 0 or 1
+#if HTP_LCD_NEW != 0 && HTP_LCD_NEW != 1 && HTP_LCD_NEW != 2
+#error HTP_LCD_NEW must be 0, 1 or 2
 #endif
 const unsigned g_lcd_panel_new = HTP_LCD_NEW;
 // LCD初始化函数`
 void LCD_Init(void)
 {
+#if HTP_LCD_NEW == 2
+    LCD_RESET_HIGH(); HAL_Delay(1);
+    LCD_RESET_LOW(); HAL_Delay(10);
+    LCD_RESET_HIGH(); HAL_Delay(120);
+#include "lcd_ep28062s_287.inc"
+#endif
 	#if !HTP_LCD_NEW
     // 复位LCD
     LCD_RESET_HIGH(); // 复位引脚置高
@@ -402,7 +408,7 @@ void LCD_Init(void)
 #endif
    // Vendor-provided init sequence (new panel)
 
-   #if HTP_LCD_NEW
+   #if HTP_LCD_NEW == 1
     LCD_RESET_HIGH();
     HAL_Delay(10);
     LCD_RESET_LOW();

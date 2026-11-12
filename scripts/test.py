@@ -8,6 +8,7 @@ cc=[str(native),'cc'] if native.exists() else [os.environ.get('CC',shutil.which(
 out=ROOT/'.cache/tests';out.mkdir(parents=True,exist_ok=True)
 inc=['-Itests/stubs','-Ifirmware/main/App/Inc','-Ifirmware/main/Bsp/Inc','-Ifirmware/screen/HardWare/Inc','-Ishared/protocol']
 cases={
+ 'home_reference':['tests/test_home_reference.c'],
  'pressure_persistence':['tests/test_pressure_persistence.c','firmware/main/Bsp/Src/pressure_tuning.c','shared/protocol/system_wire.c'],
  'motor_driver':['tests/test_motor_driver.c','firmware/main/Bsp/Src/tmc5130_driver.c'],
  'ads_zero':['tests/test_ads_zero.c','firmware/main/Bsp/Src/ads1220_driver.c'],

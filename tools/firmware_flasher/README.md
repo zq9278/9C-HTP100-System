@@ -64,3 +64,9 @@ python scripts/package_info.py --role screen-old --preset Release
 命令依据：[SEGGER J-Link Commander](https://kb.segger.com/J-Link_Commander)、[J-Link Command Strings](https://kb.segger.com/J-Link_Command_Strings)。
 
 本机已验证三个目标构建、HEX 合并/损坏拒绝、并发拒绝、失败中止和 Electron 界面启动。**尚未进行真实 J-Link 下载及新旧面板点亮验证。** 首次分别烧录三个板型并保留日志；两种屏幕均需断电重启确认 BOOT 能正常启动外部程序。
+
+## 11月11日屏幕 EP28062S_287
+
+选择“屏幕 → 11月11日更新屏幕程序”。新增独立板型 `screen-nov11`，完整HEX含原BOOT；原新屏与旧屏仍分别保留。
+
+初始化采用供应文件的有效FW序列，未启用注释中的BW序列；同步采用其480×640时序：HSPW=2、HBPD=44、HFPD=46，VSPW=2、VBPD=14、VFPD=16。厂商24位总线参数不改变现有RGB565帧缓冲格式。固件产品版本日期保持20261104。新增面板仍需实机点亮、颜色方向、触摸与断电重启验收。

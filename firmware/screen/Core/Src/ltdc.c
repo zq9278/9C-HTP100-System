@@ -44,6 +44,16 @@ void MX_LTDC_Init(void)
   hltdc.Init.VSPolarity = LTDC_VSPOLARITY_AL;
   hltdc.Init.DEPolarity = LTDC_DEPOLARITY_AL;
   hltdc.Init.PCPolarity = LTDC_PCPOLARITY_IIPC;
+#if HTP_LCD_NEW == 2
+  hltdc.Init.HorizontalSync = 1;
+  hltdc.Init.VerticalSync = 1;
+  hltdc.Init.AccumulatedHBP = 45;
+  hltdc.Init.AccumulatedVBP = 15;
+  hltdc.Init.AccumulatedActiveW = 525;
+  hltdc.Init.AccumulatedActiveH = 655;
+  hltdc.Init.TotalWidth = 571;
+  hltdc.Init.TotalHeigh = 671;
+#else
   hltdc.Init.HorizontalSync = 0;
   hltdc.Init.VerticalSync = 5;
   hltdc.Init.AccumulatedHBP = 30;
@@ -52,6 +62,7 @@ void MX_LTDC_Init(void)
   hltdc.Init.AccumulatedActiveH = 675;
   hltdc.Init.TotalWidth = 522;
   hltdc.Init.TotalHeigh = 687;
+#endif
   hltdc.Init.Backcolor.Blue = 0;
   hltdc.Init.Backcolor.Green = 0;
   hltdc.Init.Backcolor.Red = 0;

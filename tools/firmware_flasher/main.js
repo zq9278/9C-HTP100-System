@@ -87,18 +87,21 @@ app.whenReady().then(() => {
     win.webContents.once('did-fail-load', () => app.exit(1));
     win.webContents.once('did-finish-load', () => setTimeout(async () => {
       try {
-        const ready = await win.webContents.executeJavaScript('document.querySelectorAll("[name=role]").length === 2 && document.querySelectorAll("[name=panel]").length === 2 && document.getElementById("root").textContent.length > 0');
+        const ready = await win.webContents.executeJavaScript('document.querySelectorAll("[name=role]").length === 2 && document.querySelectorAll("[name=panel]").length === 3 && document.getElementById("root").textContent.length > 0');
         if (!ready) throw Error('Renderer not ready');
         const nested = await win.webContents.executeJavaScript(`(async () => {
           const main = document.querySelector('[name=role][value=main]');
           const screen = document.querySelector('[name=role][value=screen]');
           const old = document.querySelector('[name=panel][value=screen-old]');
           const fresh = document.querySelector('[name=panel][value=screen-new]');
+          const nov11 = document.querySelector('[name=panel][value=screen-nov11]');
           if (!document.getElementById('screen-variants').hidden) return false;
           screen.checked = true; await screen.onchange();
           if (document.getElementById('screen-variants').hidden || options().role !== 'screen-new') return false;
           old.checked = true; await old.onchange();
           if (options().role !== 'screen-old') return false;
+          nov11.checked = true; await nov11.onchange();
+          if (options().role !== 'screen-nov11') return false;
           main.checked = true; await main.onchange();
           if (!document.getElementById('screen-variants').hidden || options().role !== 'main') return false;
           screen.checked = true; fresh.checked = true; await screen.onchange();
@@ -109,7 +112,7 @@ app.whenReady().then(() => {
           await win.webContents.executeJavaScript('busy = true; flashActive = true; ++revision; render(); flashProgress(3)');
         }
         if (win.isResizable() || win.isMaximizable()) throw Error('Window must be fixed size');
-        if (bundled) for (const role of ['main','screen-new','screen-old']) await programmer.inspect({role,preset:'Release'});
+        if (bundled) for (const role of ['main','screen-new','screen-old','screen-nov11']) await programmer.inspect({role,preset:'Release'});
         if (bundled) programmer.verifyRuntime();
         if (process.argv.includes('--preview-long-log')) {
           const fits = await win.webContents.executeJavaScript(`(async () => {

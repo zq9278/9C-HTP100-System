@@ -4,7 +4,7 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const {spawn} = require('node:child_process');
 const ROOT = path.resolve(__dirname, '../..');
-const ROLES = ['main', 'screen-new', 'screen-old'];
+const ROLES = ['main', 'screen-new', 'screen-old', 'screen-nov11'];
 const PRESETS = ['Release', 'Debug', 'Tuning'];
 const LOADER = 'CLK@PF10_nCS@PB6_D0@PF8_D1@PF9_D2@PF7_D3@PF6';
 const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');

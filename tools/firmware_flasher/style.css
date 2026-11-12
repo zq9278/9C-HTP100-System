@@ -10,3 +10,5 @@ main{grid-template-columns:minmax(0,1fr)}main>section,details,.grow{min-width:0}
 #flash-progress{margin-top:12px;padding:10px 12px;border-radius:8px;background:#eff6ff}#flash-progress-text{margin:0;color:#155ca2;font-weight:600}#flash-bar{display:block;height:14px;margin-top:8px;accent-color:#1565ba}#flash-progress.failed{background:#fff1f1}#flash-progress.failed p{color:#b32732}#flash-progress.failed progress{accent-color:#b32732}
 
 #rtt-log {height:190px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;} input[type=number] {width:125px;}
+
+.screen-variants{flex-wrap:wrap;column-gap:20px;row-gap:8px}.screen-variants label{white-space:nowrap}

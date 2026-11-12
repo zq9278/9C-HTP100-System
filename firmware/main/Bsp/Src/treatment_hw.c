@@ -1,5 +1,6 @@
 #include "treatment_hw.h"
 #include "pressure_motion.h"
+#include "home_reference.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -529,9 +530,9 @@ AppAsyncResult TreatmentHw_HomePoll(void)
 #endif
     /* Capture both the current switch and latched transient events. Revoke
      * motion immediately so switch bounce cannot restart the hardware ramp. */
-    if (!g_home_stop_requested && (ramp_status & 0x2AU) != 0U) {
-        if (Tmc5130Driver_Write(0x27U, 0U) != HAL_OK ||
-            Tmc5130Driver_Write(0x20U, 3U) != HAL_OK) {
+    if (!g_home_stop_requested && HomeReference_Triggered(ramp_status)) {
+        /* Stay in velocity mode until zero: HOLD preserves current velocity. */
+        if (Tmc5130Driver_Write(0x27U, 0U) != HAL_OK) {
             return home_begin_recovery(now, "reference stop command failed");
         }
         g_home_stop_requested = true;
@@ -547,9 +548,9 @@ AppAsyncResult TreatmentHw_HomePoll(void)
     if (!g_home_stop_requested) {
         return APP_ASYNC_BUSY;
     }
-    /* Never resume motion after an unconfirmed trigger. Keep stopped and
-     * require fresh, consecutive observations; the overall timeout applies. */
-    if ((ramp_status & 0x402U) != 0x402U) {
+    /* The reference event is latched in g_home_stop_requested. A passing
+     * flag may leave the optical slot after triggering; only zero must persist. */
+    if (!HomeReference_Stopped(g_home_stop_requested, ramp_status)) {
         g_home_confirming = false;
         return APP_ASYNC_BUSY;
     }
@@ -563,7 +564,8 @@ AppAsyncResult TreatmentHw_HomePoll(void)
     }
     uint32_t actual_position;
     uint32_t target_position;
-    if (Tmc5130Driver_Write(0x21U, 0U) != HAL_OK ||
+    if (Tmc5130Driver_Write(0x20U, 3U) != HAL_OK ||
+        Tmc5130Driver_Write(0x21U, 0U) != HAL_OK ||
         Tmc5130Driver_Write(0x2DU, 0U) != HAL_OK ||
         Tmc5130Driver_Read(0x21U, &actual_position) != HAL_OK ||
         Tmc5130Driver_Read(0x2DU, &target_position) != HAL_OK ||

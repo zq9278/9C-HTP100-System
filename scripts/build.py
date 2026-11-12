@@ -57,9 +57,9 @@ def build(role, preset):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--preset',choices=['Debug','Release','Tuning'],default='Debug')
-    parser.add_argument('--board',choices=['all','main','screen-new','screen-old'],default='all')
+    parser.add_argument('--board',choices=['all','main','screen-new','screen-old','screen-nov11'],default='all')
     args=parser.parse_args()
-    roles=('main','screen-new','screen-old') if args.board=='all' else (args.board,)
+    roles=('main','screen-new','screen-old','screen-nov11') if args.board=='all' else (args.board,)
     images={role:build(role,args.preset) for role in roles}
     if args.board=='all':
         dest=ROOT/'out'/args.preset/'manifest.json'

@@ -70,6 +70,25 @@ bool ScreenLink_Request(uint16_t cmd, float value, uint16_t duration_s)
     (void)send(request_kind, request_sequence, request, request_length);
     return true;
 }
+/* Resolve only operation errors contradicted by this exact session's state.
+ * Never clear link failures, faults, or errors belonging to another session. */
+static void reconcile_operation_result(void)
+{
+    if (pending || request_kind != SW_REQUEST || !ScreenLink_Healthy() ||
+        (result != SW_REJECTED && result != SW_STALE) ||
+        Sw_Get32(request) != host_id || Sw_Get32(request+4) != session_id ||
+        Sw_Get16(snapshot+16) != 0) return;
+    uint16_t cmd=Sw_Get16(request+8);
+    uint8_t state=snapshot[12], mode=snapshot[13];
+    bool start=(cmd==0x1040 && mode==APP_MODE_HEAT) ||
+               (cmd==0x1006 && mode==APP_MODE_PRESSURE) ||
+               (cmd==0x1036 && mode==APP_MODE_AUTO);
+    bool stop=cmd==0x1030 || cmd==0x1034 || cmd==0x1038;
+    bool finished=(state==APP_STATE_HOMING || state==APP_STATE_IDLE) &&
+                  (snapshot[18]==APP_STOP_USER || snapshot[18]==APP_STOP_NATURAL);
+    if ((start && state==APP_STATE_RUNNING) ||
+        ((start || stop) && finished)) result=SW_OK;
+}
 static void receive(uint8_t type, uint16_t sequence, const uint8_t *p, uint8_t size)
 {
     if (type == SW_SNAPSHOT && size == SW_SNAPSHOT_BYTES) {
@@ -119,5 +138,5 @@ void ScreenLink_Tick(void)
         }
     }
     if (!ScreenLink_Healthy()) { screen_system_link_lost(); return; }
-    if (dirty) { dirty = false; screen_apply_system_state(snapshot, pending, result); }
+    if (dirty) { reconcile_operation_result(); dirty = false; screen_apply_system_state(snapshot, pending, result); }
 }

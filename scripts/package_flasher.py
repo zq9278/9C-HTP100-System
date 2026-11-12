@@ -37,7 +37,7 @@ def main():
         subprocess.run([sys.executable, str(ROOT / 'scripts/build.py'), '--preset', 'Release'], cwd=ROOT, check=True)
     subprocess.run([sys.executable, str(ROOT / 'scripts/build.py'), '--board', 'main', '--preset', 'Tuning'], cwd=ROOT, check=True)
     subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', '--name', 'htp-rtt-bridge', '--distpath', str(ROOT / '.cache/rtt-dist'), '--workpath', str(ROOT / '.cache/rtt-build'), '--specpath', str(ROOT / '.cache'), '--collect-all', 'pylink', str(ROOT / 'tools/pressure_tuner/rtt_bridge.py')], cwd=ROOT, check=True)
-    images = {role: inspect(role, 'Release') for role in ('main', 'screen-new', 'screen-old')}
+    images = {role: inspect(role, 'Release') for role in ('main', 'screen-new', 'screen-old', 'screen-nov11')}
     # One distributable must contain one matched firmware release.
     if len({i['git_commit'] for i in images.values()}) != 1:
         raise SystemExit('Mixed firmware commits; rebuild all Release targets first.')

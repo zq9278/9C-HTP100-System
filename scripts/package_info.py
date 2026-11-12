@@ -3,7 +3,7 @@ import argparse, hashlib, json
 from pathlib import Path
 from ihex import read_hex, MAIN_FLASH, BOOT_FLASH, SCREEN_FLASH, SCREEN_RAM
 ROOT=Path(__file__).resolve().parents[1]
-ROLES=('main','screen-new','screen-old')
+ROLES=('main','screen-new','screen-old','screen-nov11')
 PRESETS=('Debug','Release','Tuning')
 
 def inspect(role,preset,root=ROOT):

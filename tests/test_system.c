@@ -382,9 +382,41 @@ static void test_wire_and_motion(void)
     assert(PressureMotion_Command(250,250,20000,60000,200,.9f,true)==0);
     assert(PressureMotion_Command(250,260,20000,60000,200,.9f,true)<0);
 }
+static void test_physical_and_screen_start_stop(void)
+{
+    reset_fixture(); SystemLink_Init(); ScreenLink_Init();
+    for(unsigned i=0;i<5;i++)advance(200);
+    assert(ScreenLink_Request(0x1005,250,60)); exchange();
+    assert(AppController_Start()); /* Physical trigger wins the race. */
+    unsigned starts=pressure_start_count, consumed=eye_consume_count;
+    assert(ScreenLink_Request(0x1006,0,0)); exchange();
+    assert(rendered_result==SW_OK);
+    assert(pressure_start_count==starts && eye_consume_count==consumed);
+    advance(500);
+    uint32_t remaining=AppController_Status()->remaining_ms;
+    assert(ScreenLink_Request(0x1006,0,0)); exchange();
+    assert(rendered_result==SW_OK && AppController_Status()->remaining_ms==remaining);
+    /* A delayed rejection must not leave a failure label over confirmed RUNNING. */
+    assert(ScreenLink_Request(0x1006,0,0));
+    uint16_t seq=Sw_Get16(to_host+4); host_size=0;
+    uint8_t rejected[8]={0}, reply[SW_MAX_FRAME];
+    Sw_Put16(rejected,0x1006); rejected[2]=SW_REJECTED;
+    rejected[3]=APP_STATE_RUNNING;
+    Sw_Put32(rejected+4,AppController_Status()->session_id);
+    size_t len=Sw_Encode(reply,SW_RESULT,seq,rejected,sizeof(rejected));
+    ScreenLink_Feed(reply,len); advance(200);
+    assert(rendered_result==SW_OK && AppController_Status()->state==APP_STATE_RUNNING);
+    AppController_Stop(APP_STOP_USER); /* Physical STOP wins. */
+    assert(ScreenLink_Request(0x1034,0,0)); exchange();
+    assert(rendered_result==SW_OK && AppController_Status()->state!=APP_STATE_RUNNING);
+    starts=pressure_start_count;
+    assert(ScreenLink_Request(0x1006,0,0)); exchange();
+    assert(AppController_Status()->state!=APP_STATE_RUNNING && pressure_start_count==starts);
+    screen_size=host_size=0;
+}
 int main(void)
 {
-    original_controller_suite();test_engineering_link();test_cooperative_zero();test_wire_and_motion();test_local_deadline_and_bounds();test_link();test_one_way_loss_and_reboots();test_prepare_during_return_and_zero();test_voltage_policy();test_calibration_protocol();test_battery_display_transients();
+    original_controller_suite();test_physical_and_screen_start_stop();test_engineering_link();test_cooperative_zero();test_wire_and_motion();test_local_deadline_and_bounds();test_link();test_one_way_loss_and_reboots();test_prepare_during_return_and_zero();test_voltage_policy();test_calibration_protocol();test_battery_display_transients();
     assert(PressureMotion_Slew(20000,0,.02f,100000)==0);
     assert(PressureMotion_Slew(0,20000,.02f,100000)==2000);
     puts("PASS: controller, protocol recovery, real host/client link, duplicate requests, timer rollover, motion continuity");

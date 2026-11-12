@@ -71,6 +71,12 @@ static uint8_t execute(uint16_t cmd, float value, uint16_t duration_s)
     switch (cmd) {
     case 0x1040: case 0x1006: case 0x1036:
         if (s->mode != (cmd == 0x1040 ? APP_MODE_HEAT : cmd == 0x1006 ? APP_MODE_PRESSURE : APP_MODE_AUTO)) return SW_REJECTED;
+        /* Identity/session validation precedes execute(). Repeated START is
+         * acknowledged without restarting outputs, consuming or resetting time. */
+        if (s->state == APP_STATE_RUNNING) return SW_OK;
+        /* A late START after a user stop is superseded, never replayed. */
+        if ((s->state == APP_STATE_HOMING || s->state == APP_STATE_IDLE) &&
+            (s->stop_reason == APP_STOP_USER || s->stop_reason == APP_STOP_NATURAL)) return SW_OK;
         return AppController_Start() ? SW_OK : SW_REJECTED;
     case 0x1030: case 0x1034: case 0x1038:
         AppController_Stop(APP_STOP_USER); return SW_OK;

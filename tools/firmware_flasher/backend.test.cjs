@@ -30,8 +30,8 @@ test('targets are closed enums; probe arguments cannot inject commands', () => {
   assert.equal(args.at(-1), 'C:/with spaces/program.jlink');
   assert.ok(args.includes('STM32H750XB'));assert.ok(args.includes('123456'));
 });
-test('both LCD targets use the same QSPI loader; main never selects external flash', () => {
-  for (const role of ['screen-old','screen-new']) {
+test('all three LCD targets use the same QSPI loader; main never selects external flash', () => {
+  for (const role of ['screen-old','screen-new','screen-nov11']) {
     const script = commandScript(role);
     assert.ok(script.includes(LOADER));assert.ok(script.includes('loadfile "firmware.hex"'));
     assert.doesNotMatch(script,/\berase\b|unlock|secure|optionbytes/i);

@@ -63,3 +63,9 @@ test('nested screen selection maps to firmware and preserves panel choice',async
   assert.equal(p.get('screen-variants').hidden,false);
   await p.get('flash').onclick(); assert.equal(p.sent().role,'screen-new');
 });
+
+test('November 11 panel selects its independent firmware',async()=>{
+  const p=await page(); p.panel.value='screen-nov11'; await p.panel.onchange();
+  await p.get('flash').onclick(); assert.equal(p.sent().role,'screen-nov11');
+  assert.equal(p.saved().panel,'screen-nov11');
+});

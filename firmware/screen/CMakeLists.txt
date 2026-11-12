@@ -34,13 +34,15 @@ enable_language(C ASM)
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
 set(HTP_LCD_PANEL "NEW" CACHE STRING "LCD initialization sequence: NEW or OLD")
-set_property(CACHE HTP_LCD_PANEL PROPERTY STRINGS NEW OLD)
+set_property(CACHE HTP_LCD_PANEL PROPERTY STRINGS NEW OLD NOV11)
 if(HTP_LCD_PANEL STREQUAL "NEW")
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HTP_LCD_NEW=1)
 elseif(HTP_LCD_PANEL STREQUAL "OLD")
     target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HTP_LCD_NEW=0)
+elseif(HTP_LCD_PANEL STREQUAL "NOV11")
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE HTP_LCD_NEW=2)
 else()
-    message(FATAL_ERROR "HTP_LCD_PANEL must be NEW or OLD")
+    message(FATAL_ERROR "HTP_LCD_PANEL must be NEW, OLD or NOV11")
 endif()
 
 # Add STM32CubeMX generated sources
